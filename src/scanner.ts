@@ -14,13 +14,17 @@ export default class Scanner extends EventEmitter {
 
     async #init() {
         const tiles = await fs.readdir("templates");
+        let templateCount = 0;
         for (const tile of tiles) {
             const templates = await fs.readdir(`templates/${tile}`);
             this.#templates[tile] = {};
             for (const template of templates) {
                 this.#templates[tile][template] = sharp(await fs.readFile(`templates/${tile}/${template}`));
+                templateCount++;
             }
         }
+
+        this.emit("load", {tiles: tiles.length, templates: templateCount})
 
         void this.#scanLoop();
     }

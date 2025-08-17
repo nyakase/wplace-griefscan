@@ -12,6 +12,13 @@ client.once(Events.ClientReady, (client) => {
     client.user.setPresence({activities: [{type: 3, name: "your pixels"}]})
 
     const scanner = new Scanner();
+    scanner.on("load", async (counts) => {
+        console.log(counts)
+        client.channels.fetch(env.get("DISCORD_CHANNEL").required().asString())
+            .then(channel => {
+                channel.setTopic(`Checking ${counts.tiles} tiles with ${counts.templates} templates every minute`);
+            })
+    })
     scanner.on("grief", async (grief) => {
         if(griefCache[grief.tile]?.[grief.name] === grief.errors) return;
         if(!griefCache[grief.tile]) griefCache[grief.tile] = {};
