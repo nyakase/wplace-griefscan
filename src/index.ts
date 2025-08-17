@@ -22,7 +22,7 @@ client.once(Events.ClientReady, (client) => {
         client.channels.fetch(env.get("DISCORD_CHANNEL").required().asString())
             .then(channel => {
                 if(channel?.isSendable()) { channel.send({
-                    content: `**${grief.name}** mismatch: ${grief.errors}/${grief.pixels} pixels`,
+                    content: `**${grief.name}** mismatch: ${grief.errors}/${grief.pixels} (~${Math.round((grief.errors/grief.pixels)*100)}%) pixels`,
                     files: [{attachment: image}]
                 }) } else {
                     throw "Channel doesn't support sending messages >.>"
