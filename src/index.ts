@@ -1,22 +1,22 @@
 import "dotenv/config";
 import * as env from 'env-var';
 import Scanner from "./scanner";
-import {Client, Events} from "discord.js";
+import {Client, Events, GatewayIntentBits, ChannelType, ActivityType} from "discord.js";
 
-const client = new Client({intents: [1]})
+const client = new Client({intents: [GatewayIntentBits.Guilds]})
 type GriefCache = Record<string, Record<string, number>>;
 let griefCache: GriefCache = {};
 
-client.once(Events.ClientReady, (client) => {
+client.once(Events.ClientReady, async (client) => {
     console.log(`Yo! Logged in as ${client.user.username}`);
-    client.user.setPresence({activities: [{type: 3, name: "your pixels"}]})
+    client.user.setPresence({activities: [{type: ActivityType.Watching, name: "your pixels"}]})
+
+    const channel = await client.channels.fetch(env.get("DISCORD_CHANNEL").required().asString());
+    if(channel?.type !== ChannelType.GuildText) throw "Can't send messages in the channel >.>"
 
     const scanner = new Scanner();
     scanner.on("load", async (counts) => {
-        client.channels.fetch(env.get("DISCORD_CHANNEL").required().asString())
-            .then(channel => {
-                channel.setTopic(`Checking ${counts.tiles} tiles with ${counts.templates} templates every minute`);
-            })
+        channel.setTopic(`Checking ${counts.tiles} tiles with ${counts.templates} templates every minute`);
     })
     scanner.on("grief", async (grief) => {
         if(griefCache[grief.tile]?.[grief.name] === grief.errors) return;
@@ -25,27 +25,14 @@ client.once(Events.ClientReady, (client) => {
 
         const image = await grief.image.clone().resize({width: Math.round(grief.width * 3), kernel: "nearest"}).toBuffer();
 
-        client.channels.fetch(env.get("DISCORD_CHANNEL").required().asString())
-            .then(channel => {
-                if(channel?.isSendable()) { channel.send({
-                    content: `**${grief.name}** mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels`,
-                    files: [{attachment: image}]
-                }) } else {
-                    throw "Channel doesn't support sending messages >.>"
-                }
-            })
+        channel.send({
+            content: `**${grief.name}** mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels`,
+            files: [{attachment: image}]
+        })
     })
     scanner.on("clean", (grief) => {
         if(!griefCache[grief.tile]) griefCache[grief.tile] = {};
-        if(griefCache[grief.tile][grief.name] > 0)
-            client.channels.fetch(env.get("DISCORD_CHANNEL").required().asString())
-                .then(channel => {
-                    if(channel?.isSendable()) { channel.send(
-                        `**${grief.name}** is clean again`,
-                    ) } else {
-                        throw "Channel doesn't support sending messages >.>"
-                    }
-                })
+        if(griefCache[grief.tile][grief.name] > 0) channel.send(`**${grief.name}** is clean again`)
 
         griefCache[grief.tile][grief.name] = 0;
     })

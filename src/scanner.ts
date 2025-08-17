@@ -37,8 +37,12 @@ export default class Scanner extends EventEmitter {
     async #scan() {
         for (const tile of Object.keys(this.#templates)) {
             const coords = tile.split(" ");
-            const tileFile = await fetch(`https://backend.wplace.live/files/s0/tiles/${coords[0]}/${coords[1]}.png`);
+            let tileFile;
+            try {
+                tileFile = await fetch(`https://backend.wplace.live/files/s0/tiles/${coords[0]}/${coords[1]}.png`, {signal: AbortSignal.timeout(5*1000)});
+            } catch {continue;}
             if(!tileFile.ok) continue;
+
             const tileSharp = sharp(await tileFile.arrayBuffer());
 
             for (const [templateName, template] of Object.entries(this.#templates[tile])) {
