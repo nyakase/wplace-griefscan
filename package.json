@@ -8,6 +8,8 @@
   },
   "dependencies": {
     "discord.js": "^14.21.0",
+    "dotenv": "^17.2.1",
+    "env-var": "^7.5.0",
     "eslint": "^9.33.0",
     "sharp": "^0.34.3"
   },
