@@ -4,7 +4,8 @@ import Scanner from "./scanner";
 import {Client, Events} from "discord.js";
 
 const client = new Client({intents: [1]})
-let griefCache = {};
+type GriefCache = Record<string, Record<string, number>>;
+let griefCache: GriefCache = {};
 
 client.once(Events.ClientReady, (client) => {
     console.log(`Yo! Logged in as ${client.user.username}`);
@@ -19,13 +20,26 @@ client.once(Events.ClientReady, (client) => {
         const image = await grief.image.clone().resize({width: Math.round(grief.width * 3), kernel: "nearest"}).toBuffer();
 
         client.channels.fetch(env.get("DISCORD_CHANNEL").required().asString())
-            .then(channel => channel.send({content: `**${grief.name}** mismatch: ${grief.errors}/${grief.pixels} pixels`,
-                    files: [{attachment: image}]}))
+            .then(channel => {
+                if(channel?.isSendable()) { channel.send({
+                    content: `**${grief.name}** mismatch: ${grief.errors}/${grief.pixels} pixels`,
+                    files: [{attachment: image}]
+                }) } else {
+                    throw "Channel doesn't support sending messages >.>"
+                }
+            })
     })
     scanner.on("clean", (grief) => {
         if(!griefCache[grief.tile]) griefCache[grief.tile] = {};
-        if(griefCache[grief.tile][grief.name] > 0) client.channels.fetch(env.get("DISCORD_CHANNEL").required().asString())
-            .then(channel => channel.send(`**${grief.name}** is clean again`))
+        if(griefCache[grief.tile][grief.name] > 0)
+            client.channels.fetch(env.get("DISCORD_CHANNEL").required().asString())
+                .then(channel => {
+                    if(channel?.isSendable()) { channel.send(
+                        `**${grief.name}** is clean again`,
+                    ) } else {
+                        throw "Channel doesn't support sending messages >.>"
+                    }
+                })
 
         griefCache[grief.tile][grief.name] = 0;
     })
