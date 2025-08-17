@@ -71,7 +71,7 @@ export default class Scanner extends EventEmitter {
                 diffData.push(tempRGBA[0], tempRGBA[1], tempRGBA[2], tempRGBA[3] === 0 ? 0 : 250);
                 if(tempRGBA[3] !== 0) errors += 1;
             } else {
-                diffData.push(tileRGBA[0], tileRGBA[1], tileRGBA[2], tileRGBA[3] === 0 ? 0 : 50);
+                diffData.push(tileRGBA[0], tileRGBA[1], tileRGBA[2], tempRGBA[3] === 0 ? 0 : 50);
             }
 
             if(tempRGBA[3] === 0) continue;
