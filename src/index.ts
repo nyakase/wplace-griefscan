@@ -13,7 +13,6 @@ client.once(Events.ClientReady, (client) => {
 
     const scanner = new Scanner();
     scanner.on("load", async (counts) => {
-        console.log(counts)
         client.channels.fetch(env.get("DISCORD_CHANNEL").required().asString())
             .then(channel => {
                 channel.setTopic(`Checking ${counts.tiles} tiles with ${counts.templates} templates every minute`);
