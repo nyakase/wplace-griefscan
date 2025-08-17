@@ -8,6 +8,7 @@ let griefCache = {};
 
 client.once(Events.ClientReady, (client) => {
     console.log(`Yo! Logged in as ${client.user.username}`);
+    client.user.setPresence({activities: [{type: 3, name: "your pixels"}]})
 
     const scanner = new Scanner();
     scanner.on("grief", async (grief) => {
