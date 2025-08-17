@@ -12,7 +12,7 @@ client.once(Events.ClientReady, (client) => {
 
     const scanner = new Scanner();
     scanner.on("grief", async (grief) => {
-        if(griefCache[grief.tile]?.[grief.name] > grief.errors) return;
+        if(griefCache[grief.tile]?.[grief.name] === grief.errors) return;
         if(!griefCache[grief.tile]) griefCache[grief.tile] = {};
         griefCache[grief.tile][grief.name] = grief.errors;
 
