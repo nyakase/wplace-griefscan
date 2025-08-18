@@ -19,9 +19,9 @@ async function startScanner() {
     if(channel?.type !== ChannelType.GuildText) throw new Error("Can't send messages in the channel >.>");
 
     const scanner = new Scanner();
-    scanner.on("load", (counts) => {
-        void channel.setTopic(`Checking ${counts.tiles} tiles against ${counts.templates} templates every minute`);
-    })
+    scanner.on("load", (counts) => void channel.setTopic(`Checking ${counts.tileCount} tiles against ${counts.templateCount} templates`));
+    scanner.on("scanned", (counts) => void channel.setTopic(`Checking ${counts.tileCount} tiles against ${counts.templateCount} templates • ${counts.errors}/${counts.pixels} mismatched pixels`));
+
     scanner.on("grief", (grief) => {
         if(griefCache[grief.tileID]?.[grief.templateName] === grief.errors) return;
         if(!griefCache[grief.tileID]) griefCache[grief.templateName] = {};

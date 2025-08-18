@@ -4,12 +4,13 @@ import sharp, {Sharp} from "sharp";
 
 type TemplateStore = Record<string, Record<string, Sharp>>;
 type ScannerEvents = {
-    "load": [{tiles: number, templates: number}],
+    "load": [{tileCount: number, templateCount: number}],
+    "scanned": [{pixels: number, errors: number, tileCount: number, templateCount: number}],
     "grief": [{
-        pixels: number, width: number, errors: number,
+        width: number, pixels: number, errors: number,
         tileID: string, templateName: string, snapshot: Sharp
     }],
-    "clean": ScannerEvents["grief"]
+    "clean": ScannerEvents["grief"],
 }
 
 export default class Scanner extends EventEmitter<ScannerEvents> {
@@ -21,8 +22,9 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
     }
 
     async #init() {
-        const tiles = await fs.readdir("templates");
         let templateCount = 0;
+
+        const tiles = await fs.readdir("templates");
         for (const tileID of tiles) {
             const templates = await fs.readdir(`templates/${tileID}`);
             this.#templates[tileID] = {};
@@ -32,7 +34,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             }
         }
 
-        this.emit("load", {tiles: tiles.length, templates: templateCount})
+        this.emit("load", {tileCount: tiles.length, templateCount: templateCount})
 
         void this.#scanLoop();
     }
@@ -43,6 +45,8 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
     }
 
     async #scan() {
+        let errors = 0; let pixels = 0; let templateCount = 0;
+
         for (const tileID of Object.keys(this.#templates)) {
             const coords = tileID.split(" ");
             let tileFile;
@@ -55,6 +59,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
 
             for (const [templateName, template] of Object.entries(this.#templates[tileID])) {
                 const check = await this.#checkTemplate(template, parseInt(templateName.split(" ")[0]), parseInt(templateName.split(" ")[1]), tileSharp)
+                errors += check.errors; pixels += check.pixels; templateCount++;
                 if(check.errors > 0) {
                     this.emit("grief", {...check, templateName, tileID});
                 } else {
@@ -62,6 +67,8 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                 }
             }
         }
+
+        this.emit("scanned", {errors, pixels, tileCount: Object.keys(this.#templates).length, templateCount});
     }
 
     async #checkTemplate(template: Sharp, x: number, y: number, tile: Sharp) {
