@@ -19,8 +19,14 @@ async function startScanner() {
     if(channel?.type !== ChannelType.GuildText) throw new Error("Can't send messages in the channel >.>");
 
     const scanner = new Scanner();
-    scanner.on("load", (counts) => void channel.setTopic(`Checking ${counts.tileCount} tiles against ${counts.templateCount} templates`));
-    scanner.on("scanned", (counts) => void channel.setTopic(`Checking ${counts.tileCount} tiles against ${counts.templateCount} templates • ${counts.errors}/${counts.pixels} mismatched pixels`));
+    let lastTopicUpdate = 0; // lol
+    scanner.on("scanned", (counts) => {
+        const topic = `Checking ${counts.tileCount} tiles against ${counts.templateCount} templates • ${counts.errors}/${counts.pixels} mismatched pixels`;
+        if(channel.topic?.split(" as of ")?.[0] !== topic && (Date.now() - lastTopicUpdate) >= 5 * 60 * 1000) {
+            lastTopicUpdate = Date.now();
+            void channel.setTopic(`${topic} as of <t:${lastTopicUpdate.toString().substring(0, lastTopicUpdate.toString().length-3)}:R>`);
+        }
+    });
 
     scanner.on("grief", (grief) => {
         if(griefCache[grief.tileID]?.[grief.templateName] === grief.errors) return;
@@ -28,10 +34,10 @@ async function startScanner() {
         griefCache[grief.tileID][grief.templateName] = grief.errors;
 
         grief.snapshot.clone().resize({width: Math.round(grief.width * 3), kernel: "nearest"}).toBuffer().then(image => {
-            void channel.send({
+            /*void channel.send({
                 content: `**${grief.templateName}** mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels`,
                 files: [{attachment: image}]
-            })
+            })*/
         }).catch(e => {
             console.error(e);
             void channel.send(`**${grief.templateName}** mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels\n-# Snapshot rendering failed for some reason >.>`)
