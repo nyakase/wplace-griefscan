@@ -22,10 +22,13 @@ async function startScanner() {
     const scanner = new Scanner();
     let lastTopicUpdate = 0; // lol
     scanner.on("scanned", (counts) => {
-        const topic = `Checking ${counts.tileCount} tiles against ${counts.templateCount} templates • ${counts.errors}/${counts.pixels} mismatched pixels`;
+        const serverStruggling = counts.trueTileCount !== counts.tileCount;
+
+        const topic = serverStruggling ? "Couldn't check some tiles" : `Checking ${counts.tileCount} tiles against ${counts.templateCount} templates • ${counts.errors}/${counts.pixels} mismatched pixels`;
         if(channel.topic?.split(" as of ")?.[0] !== topic && (Date.now() - lastTopicUpdate) >= 5 * 60 * 1000) {
             lastTopicUpdate = Date.now();
             void channel.setTopic(`${topic} as of <t:${lastTopicUpdate.toString().substring(0, lastTopicUpdate.toString().length-3)}:R>`);
+            if(serverStruggling) void channel.send("couldn't check some tiles!");
         }
     });
 

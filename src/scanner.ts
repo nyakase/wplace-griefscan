@@ -5,7 +5,7 @@ import sharp, {Sharp} from "sharp";
 type TemplateStore = Record<string, Record<string, Sharp>>;
 type ScannerEvents = {
     "load": [{tileCount: number, templateCount: number}],
-    "scanned": [{pixels: number, errors: number, tileCount: number, templateCount: number}],
+    "scanned": [{pixels: number, errors: number, tileCount: number, trueTileCount: number, templateCount: number}],
     "grief": [{
         width: number, pixels: number, errors: number,
         templateName: string, templateLocation: Pixel, snapshot: Sharp
@@ -48,16 +48,17 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
     }
 
     async #scan() {
-        let errors = 0; let pixels = 0; let templateCount = 0;
+        let errors = 0; let pixels = 0; let templateCount = 0; let tileCount = 0;
 
         for (const tileID of Object.keys(this.#templates)) {
             const coords = tileID.split(" ");
             let tileFile;
             try {
                 tileFile = await fetch(`https://backend.wplace.live/files/s0/tiles/${coords[0]}/${coords[1]}.png`, {signal: AbortSignal.timeout(5*1000)});
-            } catch {continue;}
-            if(!tileFile.ok) continue;
+            } catch {console.warn(`Failed to check tile ${coords[0]} ${coords[1]}`); continue;}
+            if(!tileFile.ok) {console.warn(`Failed to check tile ${coords[0]} ${coords[1]}`); continue;}
 
+            tileCount++;
             const tileSharp = sharp(await tileFile.arrayBuffer());
 
             for (const [templateName, template] of Object.entries(this.#templates[tileID])) {
@@ -79,7 +80,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             }
         }
 
-        this.emit("scanned", {errors, pixels, tileCount: Object.keys(this.#templates).length, templateCount});
+        this.emit("scanned", {errors, pixels, tileCount, templateCount, trueTileCount: Object.keys(this.#templates).length});
     }
 
     async #checkTemplate(template: Sharp, x: number, y: number, tile: Sharp) {
