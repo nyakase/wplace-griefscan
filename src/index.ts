@@ -5,37 +5,44 @@ import {Client, Events, GatewayIntentBits, ChannelType, ActivityType} from "disc
 
 const client = new Client({intents: [GatewayIntentBits.Guilds]})
 type GriefCache = Record<string, Record<string, number>>;
-let griefCache: GriefCache = {};
+const griefCache: GriefCache = {};
 
-client.once(Events.ClientReady, async (client) => {
+client.once(Events.ClientReady, (client) => {
     console.log(`Yo! Logged in as ${client.user.username}`);
     client.user.setPresence({activities: [{type: ActivityType.Watching, name: "your pixels"}]})
 
+    void startScanner();
+})
+
+async function startScanner() {
     const channel = await client.channels.fetch(env.get("DISCORD_CHANNEL").required().asString());
-    if(channel?.type !== ChannelType.GuildText) throw "Can't send messages in the channel >.>"
+    if(channel?.type !== ChannelType.GuildText) throw new Error("Can't send messages in the channel >.>");
 
     const scanner = new Scanner();
-    scanner.on("load", async (counts) => {
-        channel.setTopic(`Checking ${counts.tiles} tiles with ${counts.templates} templates every minute`);
+    scanner.on("load", (counts) => {
+        void channel.setTopic(`Checking ${counts.tiles} tiles against ${counts.templates} templates every minute`);
     })
-    scanner.on("grief", async (grief) => {
-        if(griefCache[grief.tile]?.[grief.name] === grief.errors) return;
-        if(!griefCache[grief.tile]) griefCache[grief.tile] = {};
-        griefCache[grief.tile][grief.name] = grief.errors;
+    scanner.on("grief", (grief) => {
+        if(griefCache[grief.tileID]?.[grief.templateName] === grief.errors) return;
+        if(!griefCache[grief.tileID]) griefCache[grief.templateName] = {};
+        griefCache[grief.tileID][grief.templateName] = grief.errors;
 
-        const image = await grief.image.clone().resize({width: Math.round(grief.width * 3), kernel: "nearest"}).toBuffer();
-
-        channel.send({
-            content: `**${grief.name}** mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels`,
-            files: [{attachment: image}]
+        grief.snapshot.clone().resize({width: Math.round(grief.width * 3), kernel: "nearest"}).toBuffer().then(image => {
+            void channel.send({
+                content: `**${grief.templateName}** mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels`,
+                files: [{attachment: image}]
+            })
+        }).catch(e => {
+            console.error(e);
+            void channel.send(`**${grief.templateName}** mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels\n-# Snapshot rendering failed for some reason >.>`)
         })
     })
     scanner.on("clean", (grief) => {
-        if(!griefCache[grief.tile]) griefCache[grief.tile] = {};
-        if(griefCache[grief.tile][grief.name] > 0) channel.send(`**${grief.name}** is clean again`)
+        if(!griefCache[grief.tileID]) griefCache[grief.tileID] = {};
+        if(griefCache[grief.tileID][grief.templateName] > 0) void channel.send(`**${grief.templateName}** is clean again`);
 
-        griefCache[grief.tile][grief.name] = 0;
+        griefCache[grief.tileID][grief.templateName] = 0;
     })
-})
+}
 
-client.login(env.get("DISCORD_TOKEN").required().asString());
+void client.login(env.get("DISCORD_TOKEN").required().asString());
