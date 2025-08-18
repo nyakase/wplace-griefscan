@@ -34,10 +34,10 @@ async function startScanner() {
         griefCache[grief.tileID][grief.templateName] = grief.errors;
 
         grief.snapshot.clone().resize({width: Math.round(grief.width * 3), kernel: "nearest"}).toBuffer().then(image => {
-            /*void channel.send({
+            void channel.send({
                 content: `**${grief.templateName}** mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels`,
                 files: [{attachment: image}]
-            })*/
+            })
         }).catch(e => {
             console.error(e);
             void channel.send(`**${grief.templateName}** mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels\n-# Snapshot rendering failed for some reason >.>`)
