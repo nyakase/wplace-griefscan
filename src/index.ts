@@ -2,6 +2,7 @@ import "dotenv/config";
 import * as env from 'env-var';
 import Scanner from "./scanner";
 import {Client, Events, GatewayIntentBits, ChannelType, ActivityType} from "discord.js";
+import {geoCoords, wplaceLink} from "./utils";
 
 const client = new Client({intents: [GatewayIntentBits.Guilds]})
 type GriefCache = Record<string, Record<string, number>>;
@@ -29,25 +30,30 @@ async function startScanner() {
     });
 
     scanner.on("grief", (grief) => {
-        if(griefCache[grief.tileID]?.[grief.templateName] === grief.errors) return;
-        if(!griefCache[grief.tileID]) griefCache[grief.templateName] = {};
-        griefCache[grief.tileID][grief.templateName] = grief.errors;
+        const tileID = `${grief.templateLocation.tx} ${grief.templateLocation.ty}`;
 
+        if(griefCache[tileID]?.[grief.templateName] === grief.errors) return;
+        if(!griefCache[tileID]) griefCache[grief.templateName] = {};
+        griefCache[tileID][grief.templateName] = grief.errors;
+
+        const message = `[**${grief.templateName}**](<${wplaceLink(geoCoords(grief.templateLocation))}>) mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels`;
         grief.snapshot.clone().resize({width: Math.round(grief.width * 3), kernel: "nearest"}).toBuffer().then(image => {
             void channel.send({
-                content: `**${grief.templateName}** mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels`,
+                content: message,
                 files: [{attachment: image}]
             })
         }).catch(e => {
             console.error(e);
-            void channel.send(`**${grief.templateName}** mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels\n-# Snapshot rendering failed for some reason >.>`)
+            void channel.send(`${message}\n-# Snapshot rendering failed for some reason >.>`)
         })
     })
     scanner.on("clean", (grief) => {
-        if(!griefCache[grief.tileID]) griefCache[grief.tileID] = {};
-        if(griefCache[grief.tileID][grief.templateName] > 0) void channel.send(`**${grief.templateName}** is clean again`);
+        const tileID = `${grief.templateLocation.tx} ${grief.templateLocation.ty}`;
 
-        griefCache[grief.tileID][grief.templateName] = 0;
+        if(!griefCache[tileID]) griefCache[tileID] = {};
+        if(griefCache[tileID][grief.templateName] > 0) void channel.send(`[**${grief.templateName}**](<${wplaceLink(geoCoords(grief.templateLocation))}>) is clean again`);
+
+        griefCache[tileID][grief.templateName] = 0;
     })
 }
 

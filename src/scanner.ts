@@ -8,9 +8,12 @@ type ScannerEvents = {
     "scanned": [{pixels: number, errors: number, tileCount: number, templateCount: number}],
     "grief": [{
         width: number, pixels: number, errors: number,
-        tileID: string, templateName: string, snapshot: Sharp
+        templateName: string, templateLocation: Pixel, snapshot: Sharp
     }],
     "clean": ScannerEvents["grief"],
+}
+export type Pixel = {
+    tx: number, ty: number, px: number, py: number
 }
 
 export default class Scanner extends EventEmitter<ScannerEvents> {
@@ -59,11 +62,19 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
 
             for (const [templateName, template] of Object.entries(this.#templates[tileID])) {
                 const check = await this.#checkTemplate(template, parseInt(templateName.split(" ")[0]), parseInt(templateName.split(" ")[1]), tileSharp)
+
                 errors += check.errors; pixels += check.pixels; templateCount++;
+                const templateLocation: Pixel = {
+                    tx: parseInt(tileID.split(" ")[0]),
+                    ty: parseInt(tileID.split(" ")[1]),
+                    px: parseInt(templateName.split(" ")[0]),
+                    py: parseInt(templateName.split(" ")[1])
+                }
+
                 if(check.errors > 0) {
-                    this.emit("grief", {...check, templateName, tileID});
+                    this.emit("grief", {...check, templateName: templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown", templateLocation});
                 } else {
-                    this.emit("clean", {...check, templateName, tileID});
+                    this.emit("clean", {...check, templateName: templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown", templateLocation});
                 }
             }
         }
