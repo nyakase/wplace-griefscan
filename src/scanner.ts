@@ -69,8 +69,8 @@ export default class Scanner extends EventEmitter {
         for(let block = 0; block < tempPixels.length; block += 4) {
             let tempRGBA = [tempPixels[block], tempPixels[block + 1], tempPixels[block + 2], tempPixels[block + 3]];
             const tileRGBA = [tilePixels[block], tilePixels[block + 1], tilePixels[block + 2], tilePixels[block + 3]];
-
-            if(tempRGBA[0] === 222 && tempRGBA[1] === 250 && tempRGBA[2] === 206) tempRGBA = [0,0,0,0];
+            const shouldBeTransparent = tempRGBA[0] === 222 && tempRGBA[1] === 250 && tempRGBA[2] === 206;
+            if(shouldBeTransparent) tempRGBA = [0,0,0,0];
 
             if(
                 tempRGBA[0] !== tileRGBA[0] ||
@@ -79,12 +79,12 @@ export default class Scanner extends EventEmitter {
                 tempRGBA[3] !== tileRGBA[3]
             ) {
                 diffData.push(tempRGBA[0], tempRGBA[1], tempRGBA[2], tempRGBA[3]);
-                if(tempRGBA[3] !== 0) errors += 1;
+                if(tempRGBA[3] !== 0 && !shouldBeTransparent) errors += 1;
             } else {
                 diffData.push(tileRGBA[0], tileRGBA[1], tileRGBA[2], tempRGBA[3] === 0 ? 0 : 50);
             }
 
-            if(tempRGBA[3] === 0) continue;
+            if(tempRGBA[3] === 0 && !shouldBeTransparent) continue;
 
             pixels += 1;
         }
