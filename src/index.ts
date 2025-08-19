@@ -33,10 +33,11 @@ async function startScanner() {
     });
 
     scanner.on("grief", (grief) => {
+        console.log(grief.templateLocation)
         const tileID = `${grief.templateLocation.tx} ${grief.templateLocation.ty}`;
 
         if(griefCache[tileID]?.[grief.templateName] === grief.errors) return;
-        if(!griefCache[tileID]) griefCache[grief.templateName] = {};
+        if(!griefCache[tileID]) griefCache[tileID] = {};
         griefCache[tileID][grief.templateName] = grief.errors;
 
         const message = `[**${grief.templateName}**](<${wplaceLink(geoCoords(grief.templateLocation))}>) mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels`;
