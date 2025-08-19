@@ -106,7 +106,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                 tempRGBA[3] !== tileRGBA[3]
             ) {
                 diffData.push(tempRGBA[0], tempRGBA[1], tempRGBA[2], tempRGBA[3]);
-                if(tempRGBA[3] !== 0 && !shouldBeTransparent) errors += 1;
+                if(tempRGBA[3] !== 0 || shouldBeTransparent && tileRGBA[3] !== 0) errors += 1;
             } else {
                 diffData.push(tileRGBA[0], tileRGBA[1], tileRGBA[2], tempRGBA[3] === 0 ? 0 : 50);
             }
