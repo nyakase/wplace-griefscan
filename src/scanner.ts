@@ -29,9 +29,11 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
 
         const tiles = await fs.readdir("templates");
         for (const tileID of tiles) {
+            if(!/\d+ \d+/.test(tileID)) continue;
             const templates = await fs.readdir(`templates/${tileID}`);
             this.#templates[tileID] = {};
             for (const templateName of templates) {
+                if(!/\d+ \d+ \w+\.png/.test(templateName)) continue;
                 this.#templates[tileID][templateName] = sharp(await fs.readFile(`templates/${tileID}/${templateName}`));
                 templateCount++;
             }
