@@ -35,7 +35,6 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             for (const templateName of templates) {
                 console.log(templateName)
                 if(!/\d+ \d+ .+\.png/.test(templateName)) continue;
-                console.log("OK")
                 this.#templates[tileID][templateName] = sharp(await fs.readFile(`templates/${tileID}/${templateName}`));
                 templateCount++;
             }
