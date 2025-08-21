@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import EventEmitter from "node:events";
 import sharp, {Sharp} from "sharp";
+import {sleep} from "./utils";
 
 type TemplateStore = Record<string, Record<string, Sharp>>;
 type ScannerEvents = {
@@ -81,6 +82,8 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                     this.emit("clean", {...check, templateName: templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown", templateLocation});
                 }
             }
+
+            await sleep(300);
         }
 
         this.emit("scanned", {errors, pixels, tileCount, templateCount, trueTileCount: Object.keys(this.#templates).length});

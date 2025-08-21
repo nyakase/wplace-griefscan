@@ -21,3 +21,5 @@ export function geoCoords({tx, ty, px, py}: Pixel) {
 
 type Coordinates = {lat: string; lng: string};
 export const wplaceLink = ({lat,lng}: Coordinates) => `https://wplace.live/?lat=${lat}&lng=${lng}&zoom=15`;
+
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms)); // https://stackoverflow.com/a/39914235
