@@ -2,7 +2,7 @@ import "dotenv/config";
 import * as env from 'env-var';
 import Scanner from "./scanner";
 import {Client, Events, GatewayIntentBits, ChannelType, ActivityType} from "discord.js";
-import {geoCoords, wplaceLink} from "./utils";
+import {templateLink, templateStats} from "./utils";
 
 const client = new Client({intents: [GatewayIntentBits.Guilds]})
 type GriefCache = Record<string, Record<string, number>>;
@@ -33,14 +33,13 @@ async function startScanner() {
     });
 
     scanner.on("grief", (grief) => {
-        console.log(grief.templateLocation)
-        const tileID = `${grief.templateLocation.tx} ${grief.templateLocation.ty}`;
+        const tileID = `${grief.template.location.tx} ${grief.template.location.ty}`;
 
-        if(griefCache[tileID]?.[grief.templateName] === grief.errors) return;
+        if(griefCache[tileID]?.[grief.template.name] === grief.errors) return;
         if(!griefCache[tileID]) griefCache[tileID] = {};
-        griefCache[tileID][grief.templateName] = grief.errors;
+        griefCache[tileID][grief.template.name] = grief.errors;
 
-        const message = `[**${grief.templateName}**](<${wplaceLink(geoCoords(grief.templateLocation))}>) mismatch: ${grief.errors}/${grief.pixels} (~${((grief.errors/grief.pixels)*100).toFixed(1)}%) pixels`;
+        const message = templateStats(grief);
         grief.snapshot.clone().resize({width: Math.round(grief.width * 3), kernel: "nearest"}).toBuffer().then(image => {
             void channel.send({
                 content: message,
@@ -52,12 +51,12 @@ async function startScanner() {
         })
     })
     scanner.on("clean", (grief) => {
-        const tileID = `${grief.templateLocation.tx} ${grief.templateLocation.ty}`;
+        const tileID = `${grief.template.location.tx} ${grief.template.location.ty}`;
 
         if(!griefCache[tileID]) griefCache[tileID] = {};
-        if(griefCache[tileID][grief.templateName] > 0) void channel.send(`[**${grief.templateName}**](<${wplaceLink(geoCoords(grief.templateLocation))}>) is clean again`);
+        if(griefCache[tileID][grief.template.name] > 0) void channel.send(`${templateLink(grief.template)} is clean again`);
 
-        griefCache[tileID][grief.templateName] = 0;
+        griefCache[tileID][grief.template.name] = 0;
     })
 }
 

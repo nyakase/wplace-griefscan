@@ -9,12 +9,15 @@ type ScannerEvents = {
     "scanned": [{pixels: number, errors: number, tileCount: number, trueTileCount: number, templateCount: number}],
     "grief": [{
         width: number, pixels: number, errors: number,
-        templateName: string, templateLocation: Pixel, snapshot: Sharp
+        template: CoreTemplate, snapshot: Sharp
     }],
     "clean": ScannerEvents["grief"],
 }
-export type Pixel = {
+export type WplaceCoordinate = {
     tx: number, ty: number, px: number, py: number
+}
+export type CoreTemplate = {
+    name: string, location: WplaceCoordinate
 }
 
 export default class Scanner extends EventEmitter<ScannerEvents> {
@@ -69,17 +72,18 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                 const check = await this.#checkTemplate(template, parseInt(templateName.split(" ")[0]), parseInt(templateName.split(" ")[1]), tileSharp)
 
                 errors += check.errors; pixels += check.pixels; templateCount++;
-                const templateLocation: Pixel = {
+                const templateLocation: WplaceCoordinate = {
                     tx: parseInt(tileID.split(" ")[0]),
                     ty: parseInt(tileID.split(" ")[1]),
                     px: parseInt(templateName.split(" ")[0]),
                     py: parseInt(templateName.split(" ")[1])
                 }
+                const parsedTemplateName = templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown";
 
                 if(check.errors > 0) {
-                    this.emit("grief", {...check, templateName: templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown", templateLocation});
+                    this.emit("grief", {...check, template: {name: parsedTemplateName, location: templateLocation}});
                 } else {
-                    this.emit("clean", {...check, templateName: templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown", templateLocation});
+                    this.emit("clean", {...check, template: {name: parsedTemplateName, location: templateLocation}});
                 }
             }
 
