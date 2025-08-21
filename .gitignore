@@ -1,4 +1,5 @@
-templates
+templates/*
+!templates/README.md
 node_modules
 dist
 .env
