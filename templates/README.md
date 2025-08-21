@@ -12,6 +12,6 @@ Put your templates into a tile folder (see above). The template should be a PNG 
 If Blue Marble says "Tl X: 19, Tl Y: 1303, Px X: 718, Px Y: 432" and I want to name my template seal, the final result is `19 1303/718 423 seal.png`.
 
 ## Colors
-The scanner does not have a palette converter. Make sure your template's colors are correct, otherwise you will get a large amount of mismatches since the colors aren't the "exact" same.
+**The scanner does not have a palette converter.** Make sure your template's colors are correct, otherwise you will get a large amount of mismatches since the colors aren't the "exact" same.
 
 Any pixels that are transparent in the template will be ignored by the scanner. You can use the color `#deface` to tell the scanner that a pixel should be transparent. Note that the bot renders `#deface` pixels as transparent in its alerts.
