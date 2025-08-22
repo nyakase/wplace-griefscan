@@ -1,11 +1,11 @@
 import * as fs from "node:fs/promises";
 import EventEmitter from "node:events";
 import sharp, {Sharp} from "sharp";
+import chokidar from "chokidar";
 import {sleep} from "./utils";
 
 type TemplateStore = Record<string, Record<string, Sharp>>;
 type ScannerEvents = {
-    "load": [{tileCount: number, templateCount: number}],
     "scanned": [{pixels: number, errors: number, tileCount: number, trueTileCount: number, templateCount: number}],
     "grief": [{
         width: number, pixels: number, errors: number,
@@ -25,32 +25,48 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
 
     constructor() {
         super();
-        void this.#init();
+        this.#init();
     }
 
-    async #init() {
-        let templateCount = 0;
-
-        const tiles = await fs.readdir("templates");
-        for (const tileID of tiles) {console.log(tileID)
-            if(!/\d+ \d+/.test(tileID)) continue;
-            const templates = await fs.readdir(`templates/${tileID}`);
-            this.#templates[tileID] = {};
-            for (const templateName of templates) {
-                console.log(templateName)
-                if(!/\d+ \d+ .+\.png/.test(templateName)) continue;
-                this.#templates[tileID][templateName] = sharp(await fs.readFile(`templates/${tileID}/${templateName}`));
-                templateCount++;
-            }
+    #init() {
+        const pends = new Set();
+        const updateWrap = (filename: string) => {
+            const pend = this.#fileUpdate(filename);
+            pends.add(pend); void pend.finally(() => pends.delete(pend))
         }
 
-        this.emit("load", {tileCount: tiles.length, templateCount: templateCount})
+        chokidar.watch(".", {cwd: "templates"})
+            .on("addDir", (dir) => {
+                if(!/^\d+ \d+$/.test(dir)) return;
+                this.#templates[dir] = {};
+            })
+            .on("add", (filename) => updateWrap(filename))
+            .on("change", (filename) => updateWrap(filename))
+            .on("unlink", (filename) => {
+                if(!/^\d+ \d+\/\d+ \d+ .+\.png$/.test(filename)) return;
+                const [tileID, templateName] = filename.split("/");
+                delete this.#templates[tileID]?.[templateName];
+            })
+            .on("unlinkDir", (dir) => {
+                if(!/^\d+ \d+$/.test(dir)) return;
+                delete this.#templates[dir];
+            })
+            .on("ready", () => void Promise.all(pends).then(() => void this.#scanLoop()))
+    }
 
-        void this.#scanLoop();
+    #fileUpdate(filename: string) {
+        if(!/^\d+ \d+\/\d+ \d+ .+\.png$/.test(filename)) return Promise.resolve();
+        const [tileID, templateName] = filename.split("/");
+
+        return fs.readFile(`templates/${tileID}/${templateName}`).then(image => {
+            if(image.length === 0) return console.warn(`Saw "${filename}" but it's an empty file. Assuming upload pending.`)
+            this.#templates[tileID][templateName] = sharp(image);
+        }).catch(err => console.error(err))
     }
 
     async #scanLoop() {
-        await this.#scan();
+        console.log("Scanning...", new Date())
+        try {await this.#scan()} catch(e) {console.error("Scan failed.", e)}
         setTimeout(() => void this.#scanLoop(), 60 * 1000);
     }
 
@@ -82,8 +98,10 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
 
                 if(check.errors > 0) {
                     this.emit("grief", {...check, template: {name: parsedTemplateName, location: templateLocation}});
+                    console.log(`Found mismatch in "${tileID}/${templateName}", ${errors}/${pixels} pixels.`)
                 } else {
                     this.emit("clean", {...check, template: {name: parsedTemplateName, location: templateLocation}});
+                    console.log(`Found no mismatches in "${tileID}/${templateName}"`)
                 }
             }
 

@@ -7,17 +7,18 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@types/d3-geo": "^3.1.0",
+    "chokidar": "^4.0.3",
     "d3-geo": "^3.1.1",
     "discord.js": "^14.21.0",
     "dotenv": "^17.2.1",
     "env-var": "^7.5.0",
-    "eslint": "^9.33.0",
     "sharp": "^0.34.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
+    "@types/d3-geo": "^3.1.0",
     "@types/node": "^24.3.0",
+    "eslint": "^9.33.0",
     "globals": "^16.3.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.39.1"
