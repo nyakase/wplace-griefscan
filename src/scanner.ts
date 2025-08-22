@@ -98,10 +98,9 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
 
                 if(check.errors > 0) {
                     this.emit("grief", {...check, template: {name: parsedTemplateName, location: templateLocation}});
-                    console.log(`Found mismatch in "${tileID}/${templateName}", ${errors}/${pixels} pixels.`)
+                    console.log(`Found mismatch in "${tileID}/${templateName}", ${check.errors}/${check.pixels} pixels.`)
                 } else {
                     this.emit("clean", {...check, template: {name: parsedTemplateName, location: templateLocation}});
-                    console.log(`Found no mismatches in "${tileID}/${templateName}"`)
                 }
             }
 
