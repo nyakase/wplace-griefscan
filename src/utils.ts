@@ -1,6 +1,10 @@
 import {geoMercator} from "d3-geo";
 import {CoreTemplate, WplaceCoordinate} from "./scanner";
 import * as env from "env-var";
+import {GriefCache} from "./index";
+import {GuildTextBasedChannel, Message} from "discord.js";
+
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms)); // https://stackoverflow.com/a/39914235
 
 // https://observablehq.com/@d3/web-mercator-tiles
 export function geoCoords({tx, ty, px, py}: WplaceCoordinate) {
@@ -36,5 +40,25 @@ export const templateLink = ({name, location}: CoreTemplate) => {
     }
 }
 export const templateStats = ({template, errors, pixels}: TemplateStatsOptions) => `${templateLink(template)} mismatch: ${errors}/${pixels} (~${((errors/pixels)*100).toFixed(1)}%) pixels`;
+export const griefList = (griefCache: GriefCache) => {
+    let text = "## top 10 griefs";
+    const flatCache: [{errors: number, template: CoreTemplate}] = Object.values(griefCache).flatMap(tile => Object.values(tile));
+    const templates = flatCache.sort((a,b) => b.errors-a.errors).slice(0,10);
 
-export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms)); // https://stackoverflow.com/a/39914235
+    for (const temp of templates) {
+        if (temp.errors === 0) break;
+        text += `\n* ${templateLink(temp.template)} has ${temp.errors} mismatch${temp.errors !== 1 ? "es" : ""}`;
+    }
+
+    if(text === "## top 10 griefs") text += "\n* WOW! none!";
+    return text;
+}
+
+// https://github.com/LITdevs/ban-chan/blob/7f4d4847c22d8cb03137752268b0c2b92fdc4770/index.js#L10
+// ideally improve on this logic later
+export async function findManagedMessage(channel: GuildTextBasedChannel, author: number): Promise<Message> {
+    const message = (await channel.messages.fetch({limit:1})).first();
+
+    if(message?.author.id === author) return message;
+    return null;
+}
