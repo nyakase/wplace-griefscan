@@ -40,13 +40,15 @@ export const templateLink = ({name, location}: CoreTemplate) => {
 }
 export const templateStats = ({template, errors}: TemplateStatsOptions) => `${templateLink(template)} mismatch: ${errors}/${template.pixels} (~${((errors/template.pixels)*100).toFixed(1)}%) pixels`;
 export const griefList = (griefCache: GriefCache) => {
-    let text = "## top 10 griefs";
+    let text = "## top griefs";
     const flatCache = Object.values(griefCache).flatMap(tile => Object.values(tile));
     const templates = flatCache.sort((a,b) => b.errors-a.errors).slice(0,10);
 
     for (const temp of templates) {
         if (temp.errors === 0) break;
-        text += `\n* ${templateStats({template: temp.template, errors: temp.errors})}`;
+        const add = `\n* ${templateStats({template: temp.template, errors: temp.errors})}`;
+        if((text + add).length > 1950) break;
+        text += add;
     }
 
     if(text === "## top 10 griefs") text += "\n* WOW! none!";
