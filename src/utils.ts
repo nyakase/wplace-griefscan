@@ -27,8 +27,7 @@ export function geoCoords({tx, ty, px, py}: WplaceCoordinate) {
 type WorldCoordinate = {lat: string; lng: string};
 type TemplateStatsOptions = {
     template: CoreTemplate,
-    errors: number,
-    pixels: number
+    errors: number
 }
 const templateBaseURL = env.get("FILESERVER_BASEURL").asString();
 export const wplaceLink = ({lat,lng}: WorldCoordinate) => `https://wplace.live/?lat=${lat}&lng=${lng}&zoom=15`;
@@ -39,15 +38,15 @@ export const templateLink = ({name, location}: CoreTemplate) => {
         return `**[${name}](<${wplaceLink(geoCoords(location))}>)**`
     }
 }
-export const templateStats = ({template, errors, pixels}: TemplateStatsOptions) => `${templateLink(template)} mismatch: ${errors}/${pixels} (~${((errors/pixels)*100).toFixed(1)}%) pixels`;
+export const templateStats = ({template, errors}: TemplateStatsOptions) => `${templateLink(template)} mismatch: ${errors}/${template.pixels} (~${((errors/template.pixels)*100).toFixed(1)}%) pixels`;
 export const griefList = (griefCache: GriefCache) => {
     let text = "## top 10 griefs";
-    const flatCache: [{errors: number, template: CoreTemplate}] = Object.values(griefCache).flatMap(tile => Object.values(tile));
+    const flatCache = Object.values(griefCache).flatMap(tile => Object.values(tile));
     const templates = flatCache.sort((a,b) => b.errors-a.errors).slice(0,10);
 
     for (const temp of templates) {
         if (temp.errors === 0) break;
-        text += `\n* ${templateLink(temp.template)} has ${temp.errors} mismatch${temp.errors !== 1 ? "es" : ""}`;
+        text += `\n* ${templateStats({template: temp.template, errors: temp.errors})}`;
     }
 
     if(text === "## top 10 griefs") text += "\n* WOW! none!";
@@ -56,7 +55,7 @@ export const griefList = (griefCache: GriefCache) => {
 
 // https://github.com/LITdevs/ban-chan/blob/7f4d4847c22d8cb03137752268b0c2b92fdc4770/index.js#L10
 // ideally improve on this logic later
-export async function findManagedMessage(channel: GuildTextBasedChannel, author: number): Promise<Message> {
+export async function findManagedMessage(channel: GuildTextBasedChannel, author: string): Promise<Message | null> {
     const message = (await channel.messages.fetch({limit:1})).first();
 
     if(message?.author.id === author) return message;

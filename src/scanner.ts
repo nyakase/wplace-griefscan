@@ -17,7 +17,7 @@ export type WplaceCoordinate = {
     tx: number, ty: number, px: number, py: number
 }
 export type CoreTemplate = {
-    name: string, location: WplaceCoordinate
+    name: string, location: WplaceCoordinate, pixels: number
 }
 
 export default class Scanner extends EventEmitter<ScannerEvents> {
@@ -97,10 +97,10 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                 const parsedTemplateName = templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown";
 
                 if(check.errors > 0) {
-                    this.emit("grief", {...check, template: {name: parsedTemplateName, location: templateLocation}});
+                    this.emit("grief", {...check, template: {name: parsedTemplateName, location: templateLocation, pixels: check.pixels}});
                     console.log(`Found mismatch in "${tileID}/${templateName}", ${check.errors}/${check.pixels} pixels.`)
                 } else {
-                    this.emit("clean", {...check, template: {name: parsedTemplateName, location: templateLocation}});
+                    this.emit("clean", {...check, template: {name: parsedTemplateName, location: templateLocation, pixels: check.pixels}});
                 }
             }
 

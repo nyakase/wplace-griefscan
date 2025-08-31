@@ -1,6 +1,6 @@
 import "dotenv/config";
 import * as env from 'env-var';
-import Scanner from "./scanner";
+import Scanner, {CoreTemplate} from "./scanner";
 import {Client, Events, GatewayIntentBits, ChannelType, ActivityType} from "discord.js";
 import {findManagedMessage, griefList, templateLink, templateStats} from "./utils";
 
@@ -35,6 +35,7 @@ async function startScanner() {
             if(serverStruggling) void channel.send("couldn't check some tiles!");
         }
 
+        if(!client.user) return; // stupid typescript
         const overview = griefList(griefCache);
         const stampedOverview = `${overview}\n-# as of <t:${now.toString().substring(0, now.toString().length-3)}:R>`
         findManagedMessage(overviewChannel, client.user.id).then(message => {
