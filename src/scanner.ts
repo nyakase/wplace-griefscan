@@ -5,23 +5,32 @@ import chokidar from "chokidar";
 import {sleep} from "./utils";
 
 type TemplateStore = Record<string, Record<string, Sharp>>;
+export type GriefCache = Record<string, Record<string, {stats: GriefStats, template: CoreTemplate}>>;
 type ScannerEvents = {
-    "scanned": [{pixels: number, errors: number, tileCount: number, trueTileCount: number, templateCount: number}],
-    "grief": [{
-        width: number, pixels: number, errors: number,
+    "scannedAll": [{
+        pixels: number, mismatches: number,
+        scannedTileCount: number, scannedTemplateCount: number
+        griefCache: GriefCache
+    }],
+    "newGrief": [{
+        width: number, stats: GriefStats,
         template: CoreTemplate, snapshot: Sharp
     }],
-    "clean": ScannerEvents["grief"],
+    "newClean": ScannerEvents["newGrief"],
 }
 export type WplaceCoordinate = {
     tx: number, ty: number, px: number, py: number
 }
 export type CoreTemplate = {
-    name: string, location: WplaceCoordinate, pixels: number
+    name: string, location: WplaceCoordinate
+}
+export type GriefStats = {
+    pixels: number, mismatches: number
 }
 
 export default class Scanner extends EventEmitter<ScannerEvents> {
     #templates: TemplateStore = {};
+    #griefCache: GriefCache = {};
 
     constructor() {
         super();
@@ -39,6 +48,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             .on("addDir", (dir) => {
                 if(!/^\d+ \d+$/.test(dir)) return;
                 this.#templates[dir] = {};
+                this.#griefCache[dir] = {};
             })
             .on("add", (filename) => updateWrap(filename))
             .on("change", (filename) => updateWrap(filename))
@@ -46,15 +56,17 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                 if(!/^\d+ \d+\/\d+ \d+ .+\.png$/.test(filename)) return;
                 const [tileID, templateName] = filename.split("/");
                 delete this.#templates[tileID]?.[templateName];
+                delete this.#griefCache[tileID]?.[templateName];
             })
             .on("unlinkDir", (dir) => {
                 if(!/^\d+ \d+$/.test(dir)) return;
                 delete this.#templates[dir];
+                delete this.#griefCache[dir];
             })
             .on("ready", () => void Promise.all(pends).then(() => void this.#scanLoop()))
     }
 
-    #fileUpdate(filename: string) {
+    async #fileUpdate(filename: string) {
         if(!/^\d+ \d+\/\d+ \d+ .+\.png$/.test(filename)) return Promise.resolve();
         const [tileID, templateName] = filename.split("/");
 
@@ -71,7 +83,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
     }
 
     async #scan() {
-        let errors = 0; let pixels = 0; let templateCount = 0; let tileCount = 0;
+        let mismatches = 0; let pixels = 0; let templateCount = 0; let tileCount = 0;
 
         for (const tileID of Object.keys(this.#templates)) {
             const coords = tileID.split(" ");
@@ -87,7 +99,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             for (const [templateName, template] of Object.entries(this.#templates[tileID])) {
                 const check = await this.#checkTemplate(template, parseInt(templateName.split(" ")[0]), parseInt(templateName.split(" ")[1]), tileSharp)
 
-                errors += check.errors; pixels += check.pixels; templateCount++;
+                mismatches += check.mismatches; pixels += check.pixels; templateCount++;
                 const templateLocation: WplaceCoordinate = {
                     tx: parseInt(tileID.split(" ")[0]),
                     ty: parseInt(tileID.split(" ")[1]),
@@ -96,18 +108,20 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                 }
                 const parsedTemplateName = templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown";
 
-                if(check.errors > 0) {
-                    this.emit("grief", {...check, template: {name: parsedTemplateName, location: templateLocation, pixels: check.pixels}});
-                    console.log(`Found mismatch in "${tileID}/${templateName}", ${check.errors}/${check.pixels} pixels.`)
-                } else {
-                    this.emit("clean", {...check, template: {name: parsedTemplateName, location: templateLocation, pixels: check.pixels}});
+                const firstScan = !this.#griefCache[tileID][templateName];
+                const hasChanged = this.#griefCache[tileID][templateName]?.stats.mismatches !== check.mismatches
+                this.#griefCache[tileID][templateName] = {template: {name: parsedTemplateName, location: templateLocation}, stats: {pixels: check.pixels, mismatches: check.mismatches}};
+
+                if(firstScan && check.mismatches > 0 || !firstScan && hasChanged) {
+                    if(check.mismatches > 0) console.log(`Found mismatch in "${tileID}/${templateName}", ${check.mismatches}/${check.pixels} pixels.`)
+                    this.emit(check.mismatches > 0 ? "newGrief" : "newClean", {...this.#griefCache[tileID][templateName], snapshot: check.snapshot, width: check.width})
                 }
             }
 
             await sleep(300);
         }
 
-        this.emit("scanned", {errors, pixels, tileCount, templateCount, trueTileCount: Object.keys(this.#templates).length});
+        this.emit("scannedAll", {mismatches, pixels, scannedTileCount: tileCount, scannedTemplateCount: templateCount, griefCache: this.#griefCache});
     }
 
     async #checkTemplate(template: Sharp, x: number, y: number, tile: Sharp) {
@@ -116,7 +130,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
         const tileExtract = tile.clone().extract({left: x, top: y, height: templateBuffer.info.height, width: templateBuffer.info.width});
         const tilePixels = await tileExtract.clone().raw().ensureAlpha().toBuffer();
 
-        let errors = 0;
+        let mismatches = 0;
         let pixels = 0;
         const diffData = [];
 
@@ -133,7 +147,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                 tempRGBA[3] !== tileRGBA[3]
             ) {
                 diffData.push(tempRGBA[0], tempRGBA[1], tempRGBA[2], tempRGBA[3]);
-                if(tempRGBA[3] !== 0 || shouldBeTransparent && tileRGBA[3] !== 0) errors += 1;
+                if(tempRGBA[3] !== 0 || shouldBeTransparent && tileRGBA[3] !== 0) mismatches += 1;
             } else {
                 diffData.push(tileRGBA[0], tileRGBA[1], tileRGBA[2], tempRGBA[3] === 0 ? 0 : 50);
             }
@@ -146,6 +160,6 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
         const snapshot = sharp(Buffer.from(diffData), {
             raw: {...templateBuffer.info}
         }).png();
-        return {pixels, errors, snapshot, width: templateBuffer.info.width};
+        return {pixels, mismatches, snapshot, width: templateBuffer.info.width};
     }
 }

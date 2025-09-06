@@ -1,7 +1,6 @@
 import {geoMercator} from "d3-geo";
-import {CoreTemplate, WplaceCoordinate} from "./scanner";
+import {CoreTemplate, WplaceCoordinate, GriefCache, GriefStats} from "./scanner";
 import * as env from "env-var";
-import {GriefCache} from "./index";
 import {GuildTextBasedChannel, Message} from "discord.js";
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms)); // https://stackoverflow.com/a/39914235
@@ -27,7 +26,7 @@ export function geoCoords({tx, ty, px, py}: WplaceCoordinate) {
 type WorldCoordinate = {lat: string; lng: string};
 type TemplateStatsOptions = {
     template: CoreTemplate,
-    errors: number
+    stats: GriefStats
 }
 const templateBaseURL = env.get("FILESERVER_BASEURL").asString();
 export const wplaceLink = ({lat,lng}: WorldCoordinate) => `https://wplace.live/?lat=${lat}&lng=${lng}&zoom=15`;
@@ -38,20 +37,20 @@ export const templateLink = ({name, location}: CoreTemplate) => {
         return `**[${name}](<${wplaceLink(geoCoords(location))}>)**`
     }
 }
-export const templateStats = ({template, errors}: TemplateStatsOptions) => `${templateLink(template)} mismatch: ${errors}/${template.pixels} (~${((errors/template.pixels)*100).toFixed(1)}%) pixels`;
+export const templateStats = ({template, stats}: TemplateStatsOptions) => `${templateLink(template)} mismatch: ${stats.mismatches}/${stats.pixels} (~${((stats.mismatches/stats.pixels)*100).toFixed(1)}%) pixels`;
 export const griefList = (griefCache: GriefCache) => {
     let text = "## top griefs";
     const flatCache = Object.values(griefCache).flatMap(tile => Object.values(tile));
-    const templates = flatCache.sort((a,b) => b.errors-a.errors).slice(0,10);
+    const templates = flatCache.sort((a,b) => b.stats.mismatches-a.stats.mismatches).slice(0,10);
 
     for (const temp of templates) {
-        if (temp.errors === 0) break;
-        const add = `\n* ${templateStats({template: temp.template, errors: temp.errors})}`;
+        if (temp.stats.mismatches === 0) break;
+        const add = `\n* ${templateStats(temp)}`;
         if((text + add).length > 1950) break;
         text += add;
     }
 
-    if(text === "## top 10 griefs") text += "\n* WOW! none!";
+    if(text === "## top griefs") text += "\n* WOW! none! 🦭";
     return text;
 }
 

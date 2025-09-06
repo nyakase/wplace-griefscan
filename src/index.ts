@@ -1,12 +1,10 @@
 import "dotenv/config";
 import * as env from 'env-var';
-import Scanner, {CoreTemplate} from "./scanner";
+import Scanner from "./scanner";
 import {Client, Events, GatewayIntentBits, ChannelType, ActivityType} from "discord.js";
 import {findManagedMessage, griefList, templateLink, templateStats} from "./utils";
 
 const client = new Client({intents: [GatewayIntentBits.Guilds]})
-export type GriefCache = Record<string, Record<string, {errors: number, template: CoreTemplate}>>;
-const griefCache: GriefCache = {};
 
 client.once(Events.ClientReady, (client) => {
     console.log(`Yo! Logged in as ${client.user.username}`);
@@ -24,10 +22,11 @@ async function startScanner() {
 
     const scanner = new Scanner();
     let lastTopicUpdate = 0; // lol
-    scanner.on("scanned", (counts) => {
-        const serverStruggling = counts.trueTileCount !== counts.tileCount;
+    scanner.on("scannedAll", (counts) => {
+        const trueTileCount = Object.keys(counts.griefCache).length;
+        const serverStruggling = counts.scannedTileCount !== trueTileCount;
 
-        const topic = serverStruggling ? "Couldn't check some tiles" : `Checking ${counts.tileCount} tiles against ${counts.templateCount} templates • ${counts.errors}/${counts.pixels} mismatched pixels`;
+        const topic = serverStruggling ? "Couldn't check some tiles" : `Checking ${counts.scannedTileCount} tiles against ${counts.scannedTemplateCount} templates • ${counts.mismatches}/${counts.pixels} mismatched pixels`;
         const now = Date.now();
         if(channel.topic?.split(" as of ")?.[0] !== topic && (now - lastTopicUpdate) >= 5 * 60 * 1000) {
             lastTopicUpdate = now;
@@ -36,7 +35,7 @@ async function startScanner() {
         }
 
         if(!client.user) return; // stupid typescript
-        const overview = griefList(griefCache);
+        const overview = griefList(counts.griefCache);
         const stampedOverview = `${overview}\n-# as of <t:${now.toString().substring(0, now.toString().length-3)}:R>`
         findManagedMessage(overviewChannel, client.user.id).then(message => {
             if(!message) {
@@ -49,14 +48,7 @@ async function startScanner() {
         })
     });
 
-    scanner.on("grief", (grief) => {
-        const tileID = `${grief.template.location.tx} ${grief.template.location.ty}`;
-        const tempID = `${grief.template.location.px} ${grief.template.location.py} ${grief.template.name}`;
-
-        if(griefCache[tileID]?.[tempID]?.errors === grief.errors) return;
-        if(!griefCache[tileID]) griefCache[tileID] = {};
-        griefCache[tileID][tempID] = {errors: grief.errors, template: grief.template};
-
+    scanner.on("newGrief", (grief) => {
         const message = templateStats(grief);
         grief.snapshot.clone().resize({width: Math.round(grief.width * 3), kernel: "nearest"}).toBuffer().then(image => {
             void channel.send({
@@ -68,14 +60,8 @@ async function startScanner() {
             void channel.send(`${message}\n-# Snapshot rendering failed for some reason >.>`);
         })
     })
-    scanner.on("clean", (grief) => {
-        const tileID = `${grief.template.location.tx} ${grief.template.location.ty}`;
-        const tempID = `${grief.template.location.px} ${grief.template.location.py} ${grief.template.name}`;
-
-        if(!griefCache[tileID]) griefCache[tileID] = {};
-        if(griefCache[tileID][tempID]?.errors > 0) void channel.send(`${templateLink(grief.template)} is clean again`);
-
-        griefCache[tileID][tempID] = {errors: 0, template: grief.template};
+    scanner.on("newClean", (grief) => {
+        void channel.send(`${templateLink(grief.template)} is clean again`);
     })
 }
 
