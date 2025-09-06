@@ -80,12 +80,14 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             })
             .on("ready", () => {
                 isReady = true;
-                void Promise.all(pends).then(() => void this.#scanLoop())
-                this.#writeOverlay();
+                void Promise.all(pends).then(() => {
+                    void this.#scanLoop();
+                    this.#writeOverlay();
+                })
             })
             .on("all", (_event, filename) => {
                 if(!isReady || !/^\d+ \d+(?:\/\d+ \d+ .+\.png|)$/.test(filename)) return;
-                this.#writeOverlay();
+                void Promise.all(pends).then(() => this.#writeOverlay())
             })
     }
 
