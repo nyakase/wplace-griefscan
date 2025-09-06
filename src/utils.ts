@@ -29,6 +29,7 @@ type TemplateStatsOptions = {
     stats: GriefStats
 }
 const templateBaseURL = env.get("FILESERVER_BASEURL").asString();
+if(!templateBaseURL) console.warn("Template linking is disabled because FILESERVER_BASEURL is unset")
 export const wplaceLink = ({lat,lng}: WorldCoordinate) => `https://wplace.live/?lat=${lat}&lng=${lng}&zoom=15`;
 export const templateLink = ({name, location}: CoreTemplate) => {
     if(templateBaseURL) {

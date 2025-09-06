@@ -3,6 +3,8 @@ import EventEmitter from "node:events";
 import sharp, {Sharp} from "sharp";
 import chokidar from "chokidar";
 import {sleep} from "./utils";
+import * as env from "env-var";
+import { join } from "node:path";
 
 type TemplateStore = Record<string, Record<string, Sharp>>;
 export type GriefCache = Record<string, Record<string, {stats: GriefStats, template: CoreTemplate}>>;
@@ -27,6 +29,18 @@ export type CoreTemplate = {
 export type GriefStats = {
     pixels: number, mismatches: number
 }
+type CharityOverlay = {
+    faction: string, contact: string,
+    templates: {
+        name: string, source: string,
+        coords: [number,number,number,number]
+    }[]
+}
+
+const faction = env.get("OVERLAY_FACTION").asString();
+const factionContact = env.get("OVERLAY_CONTACT").asString();
+const templateBaseURL = env.get("FILESERVER_BASEURL").asString();
+if(!faction || !factionContact || !templateBaseURL) console.warn("Overlay generation is disabled because one of the following are unset: OVERLAY_FACTION, OVERLAY_CONTACT, FILESERVER_BASEURL")
 
 export default class Scanner extends EventEmitter<ScannerEvents> {
     #templates: TemplateStore = {};
@@ -43,6 +57,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             const pend = this.#fileUpdate(filename);
             pends.add(pend); void pend.finally(() => pends.delete(pend))
         }
+        let isReady = false;
 
         chokidar.watch(".", {cwd: "templates"})
             .on("addDir", (dir) => {
@@ -63,7 +78,15 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                 delete this.#templates[dir];
                 delete this.#griefCache[dir];
             })
-            .on("ready", () => void Promise.all(pends).then(() => void this.#scanLoop()))
+            .on("ready", () => {
+                isReady = true;
+                void Promise.all(pends).then(() => void this.#scanLoop())
+                this.#writeOverlay();
+            })
+            .on("all", (_event, filename) => {
+                if(!isReady || !/^\d+ \d+(?:\/\d+ \d+ .+\.png|)$/.test(filename)) return;
+                this.#writeOverlay();
+            })
     }
 
     async #fileUpdate(filename: string) {
@@ -74,6 +97,31 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             if(image.length === 0) return console.warn(`Saw "${filename}" but it's an empty file. Assuming upload pending.`)
             this.#templates[tileID][templateName] = sharp(image);
         }).catch(err => console.error(err))
+    }
+
+    #writeOverlay() {
+        if(!faction || !factionContact || !templateBaseURL) return;
+        const overlay: CharityOverlay = {
+            faction: faction, contact: factionContact,
+            templates: []
+        }
+
+        for (const tileID of Object.keys(this.#templates)) {
+            for (const templateName of Object.keys(this.#templates[tileID])) {
+                overlay.templates.push({
+                    name: templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown",
+                    source: encodeURI(`${templateBaseURL}/${tileID}/${templateName}`),
+                    coords: [
+                        parseInt(tileID.split(" ")[0]),
+                        parseInt(tileID.split(" ")[1]),
+                        parseInt(templateName.split(" ")[0]),
+                        parseInt(templateName.split(" ")[1])
+                    ]
+                })
+            }
+        }
+
+        void fs.writeFile(join(__dirname, "../templates/overlay.json"), JSON.stringify(overlay));
     }
 
     async #scanLoop() {
