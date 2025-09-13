@@ -5,9 +5,11 @@ import {Client, Events, GatewayIntentBits, ChannelType, ActivityType} from "disc
 import {findManagedMessage, griefList, templateLink, templateStats} from "./utils";
 
 const client = new Client({intents: [GatewayIntentBits.Guilds]})
+const alertOnBoot = env.get("ALERT_ON_BOOT").asBool();
+let bootScan = true;
 
 client.once(Events.ClientReady, (client) => {
-    console.log(`Yo! Logged in as ${client.user.username}`);
+    console.log(`Hewwo~ I'm logged in as ${client.user.username} :3`);
     client.user.setPresence({activities: [{type: ActivityType.Watching, name: "your pixels"}]})
 
     void startScanner();
@@ -23,6 +25,8 @@ async function startScanner() {
     const scanner = new Scanner();
     let lastTopicUpdate = 0; // lol
     scanner.on("scannedAll", (counts) => {
+        bootScan = false;
+
         const trueTileCount = Object.keys(counts.griefCache).length;
         const serverStruggling = counts.scannedTileCount !== trueTileCount;
 
@@ -49,6 +53,8 @@ async function startScanner() {
     });
 
     scanner.on("newGrief", (grief) => {
+        if(bootScan && !alertOnBoot) return;
+
         const message = templateStats(grief);
         grief.snapshot.clone().resize({width: Math.round(grief.width * 3), kernel: "nearest"}).toBuffer().then(image => {
             void channel.send({

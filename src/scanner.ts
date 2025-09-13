@@ -40,7 +40,7 @@ type CharityOverlay = {
 const faction = env.get("OVERLAY_FACTION").asString();
 const factionContact = env.get("OVERLAY_CONTACT").asString();
 const templateBaseURL = env.get("FILESERVER_BASEURL").asString();
-if(!faction || !factionContact || !templateBaseURL) console.warn("Overlay generation is disabled because one of the following are unset: OVERLAY_FACTION, OVERLAY_CONTACT, FILESERVER_BASEURL")
+if(!faction || !factionContact || !templateBaseURL) console.warn("Overlay generation is disabled because one of the following are unset: OVERLAY_FACTION, OVERLAY_CONTACT, FILESERVER_BASEURL");
 
 export default class Scanner extends EventEmitter<ScannerEvents> {
     #templates: TemplateStore = {};
@@ -54,12 +54,12 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
     #init() {
         const pends = new Set();
         const updateWrap = (filename: string) => {
-            const pend = this.#fileUpdate(filename);
+            const pend = this.#fileUpdate(filename, isReady);
             pends.add(pend); void pend.finally(() => pends.delete(pend))
         }
         let isReady = false;
 
-        chokidar.watch(".", {cwd: "templates"})
+        chokidar.watch(".", {cwd: "templates", awaitWriteFinish: true})
             .on("addDir", (dir) => {
                 if(!/^\d+ \d+$/.test(dir)) return;
                 this.#templates[dir] = {};
@@ -91,13 +91,14 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             })
     }
 
-    async #fileUpdate(filename: string) {
+    async #fileUpdate(filename: string, shouldLog = false) {
         if(!/^\d+ \d+\/\d+ \d+ .+\.png$/.test(filename)) return Promise.resolve();
         const [tileID, templateName] = filename.split("/");
 
         return fs.readFile(`templates/${tileID}/${templateName}`).then(image => {
-            if(image.length === 0) return console.warn(`Saw "${filename}" but it's an empty file. Assuming upload pending.`)
+            if(image.length === 0) return console.warn(`Saw "${filename}" but it's an empty file..`)
             this.#templates[tileID][templateName] = sharp(image);
+            if(shouldLog) console.log(`"${filename}" was updated.`)
         }).catch(err => console.error(err))
     }
 
