@@ -141,31 +141,35 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             let tileFile;
             try {
                 tileFile = await fetch(`https://backend.wplace.live/files/s0/tiles/${coords[0]}/${coords[1]}.png`, {signal: AbortSignal.timeout(5*1000)});
-            } catch {console.warn(`Failed to check tile ${coords[0]} ${coords[1]}`); continue;}
-            if(!tileFile.ok) {console.warn(`Failed to check tile ${coords[0]} ${coords[1]}`); continue;}
+            } catch {console.warn(`Couldn't download tile "${coords[0]} ${coords[1]}".`); continue;}
+            if(!tileFile.ok) {console.warn(`Couldn't download tile "${coords[0]} ${coords[1]}".`); continue;}
 
             tileCount++;
             const tileSharp = sharp(await tileFile.arrayBuffer());
 
             for (const [templateName, template] of Object.entries(this.#templates[tileID])) {
-                const check = await this.#checkTemplate(template, parseInt(templateName.split(" ")[0]), parseInt(templateName.split(" ")[1]), tileSharp)
+                try {
+                    const check = await this.#checkTemplate(template, parseInt(templateName.split(" ")[0]), parseInt(templateName.split(" ")[1]), tileSharp)
 
-                mismatches += check.mismatches; pixels += check.pixels; templateCount++;
-                const templateLocation: WplaceCoordinate = {
-                    tx: parseInt(tileID.split(" ")[0]),
-                    ty: parseInt(tileID.split(" ")[1]),
-                    px: parseInt(templateName.split(" ")[0]),
-                    py: parseInt(templateName.split(" ")[1])
-                }
-                const parsedTemplateName = templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown";
+                    mismatches += check.mismatches; pixels += check.pixels; templateCount++;
+                    const templateLocation: WplaceCoordinate = {
+                        tx: parseInt(tileID.split(" ")[0]),
+                        ty: parseInt(tileID.split(" ")[1]),
+                        px: parseInt(templateName.split(" ")[0]),
+                        py: parseInt(templateName.split(" ")[1])
+                    }
+                    const parsedTemplateName = templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown";
 
-                const firstScan = !this.#griefCache[tileID][templateName];
-                const hasChanged = this.#griefCache[tileID][templateName]?.stats.mismatches !== check.mismatches
-                this.#griefCache[tileID][templateName] = {template: {name: parsedTemplateName, location: templateLocation}, stats: {pixels: check.pixels, mismatches: check.mismatches}};
+                    const firstScan = !this.#griefCache[tileID][templateName];
+                    const hasChanged = this.#griefCache[tileID][templateName]?.stats.mismatches !== check.mismatches
+                    this.#griefCache[tileID][templateName] = {template: {name: parsedTemplateName, location: templateLocation}, stats: {pixels: check.pixels, mismatches: check.mismatches}};
 
-                if(firstScan && check.mismatches > 0 || !firstScan && hasChanged) {
-                    if(check.mismatches > 0) console.log(`Found mismatch in "${tileID}/${templateName}", ${check.mismatches}/${check.pixels} pixels.`)
-                    this.emit(check.mismatches > 0 ? "newGrief" : "newClean", {...this.#griefCache[tileID][templateName], snapshot: check.snapshot, width: check.width})
+                    if(firstScan && check.mismatches > 0 || !firstScan && hasChanged) {
+                        if(check.mismatches > 0) console.log(`Found mismatch in "${tileID}/${templateName}", ${check.mismatches}/${check.pixels} pixels.`)
+                        this.emit(check.mismatches > 0 ? "newGrief" : "newClean", {...this.#griefCache[tileID][templateName], snapshot: check.snapshot, width: check.width})
+                    }
+                } catch (e) {
+                    console.error(`Trouble checking "${tileID}/${templateName}".`, e)
                 }
             }
 
