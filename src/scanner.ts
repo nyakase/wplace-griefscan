@@ -15,8 +15,8 @@ type ScannerEvents = {
         griefCache: GriefCache
     }],
     "newGrief": [{
-        width: number, stats: GriefStats,
-        template: CoreTemplate, snapshot: Sharp
+        stats: GriefStats, template: CoreTemplate,
+        width: number, snapshot: Sharp
     }],
     "newClean": ScannerEvents["newGrief"],
 }
@@ -27,7 +27,7 @@ export type CoreTemplate = {
     name: string, location: WplaceCoordinate
 }
 export type GriefStats = {
-    pixels: number, mismatches: number
+    pixels: number, mismatches: number, increasing: boolean | null
 }
 type CharityOverlay = {
     faction: string, contact: string,
@@ -160,9 +160,14 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                     }
                     const parsedTemplateName = templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown";
 
-                    const firstScan = !this.#griefCache[tileID][templateName];
-                    const hasChanged = this.#griefCache[tileID][templateName]?.stats.mismatches !== check.mismatches
-                    this.#griefCache[tileID][templateName] = {template: {name: parsedTemplateName, location: templateLocation}, stats: {pixels: check.pixels, mismatches: check.mismatches}};
+                    const prevCache = this.#griefCache[tileID][templateName];
+                    const firstScan = !prevCache;
+                    const hasChanged = check.mismatches !== prevCache?.stats.mismatches;
+                    const increasing = firstScan ? null :
+                        check.mismatches === prevCache.stats.mismatches ? prevCache.stats.increasing :
+                            check.mismatches > prevCache.stats.mismatches;
+
+                    this.#griefCache[tileID][templateName] = {template: {name: parsedTemplateName, location: templateLocation}, stats: {pixels: check.pixels, mismatches: check.mismatches, increasing}};
 
                     if(firstScan && check.mismatches > 0 || !firstScan && hasChanged) {
                         if(check.mismatches > 0) console.log(`Found mismatch in "${tileID}/${templateName}", ${check.mismatches}/${check.pixels} pixels.`)

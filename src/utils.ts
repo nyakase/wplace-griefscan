@@ -38,7 +38,12 @@ export const templateLink = ({name, location}: CoreTemplate) => {
         return `**[${name}](<${wplaceLink(geoCoords(location))}>)**`
     }
 }
-export const templateStats = ({template, stats}: TemplateStatsOptions) => `${templateLink(template)} mismatch: ${stats.mismatches}/${stats.pixels} (~${((stats.mismatches/stats.pixels)*100).toFixed(1)}%) pixels`;
+export const templateStats = ({template, stats}: TemplateStatsOptions) => `${tempStatsEmoji(stats)} ${templateLink(template)} mismatch: ${stats.mismatches}/${stats.pixels} (~${((stats.mismatches/stats.pixels)*100).toFixed(1)}%) pixels`;
+export const tempStatsEmoji = (stats: GriefStats) => {
+    if(stats.mismatches === 0) return "🦭";
+    if(stats.increasing === null) return "🤷‍♀️";
+    return stats.increasing ? "📈" : "📉";
+}
 export const griefList = (griefCache: GriefCache) => {
     let text = "## top griefs";
     const flatCache = Object.values(griefCache).flatMap(tile => Object.values(tile));
@@ -46,7 +51,7 @@ export const griefList = (griefCache: GriefCache) => {
 
     for (const temp of templates) {
         if (temp.stats.mismatches === 0) break;
-        const add = `\n* ${templateStats(temp)}`;
+        const add = `\n${templateStats(temp)}`;
         if((text + add).length > 1950) break;
         text += add;
     }

@@ -67,7 +67,7 @@ async function startScanner() {
         })
     })
     scanner.on("newClean", (grief) => {
-        void channel.send(`${templateLink(grief.template)} is clean again`);
+        void channel.send(`🦭 ${templateLink(grief.template)} is clean again`);
     })
 }
 
