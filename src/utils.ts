@@ -45,25 +45,32 @@ export const tempStatsEmoji = (stats: GriefStats) => {
     return stats.increasing ? "📈" : "📉";
 }
 export const griefList = (griefCache: GriefCache) => {
-    let text = "## top griefs";
+    let topText = "## top griefs";
+    let bottomText = "";
     const flatCache = Object.values(griefCache).flatMap(tile => Object.values(tile));
-    const templates = flatCache.sort((a,b) => b.stats.mismatches-a.stats.mismatches).slice(0,10);
+    const templates = flatCache.filter(temp => temp.stats.mismatches > 0).sort((a,b) => b.stats.mismatches-a.stats.mismatches);
 
-    for (const temp of templates) {
-        if (temp.stats.mismatches === 0) break;
+    for (const temp of templates.slice()) {
         const add = `\n${templateStats(temp)}`;
-        if((text + add).length > 1950) break;
-        text += add;
+        if((topText + add).length > 1950) break;
+        topText += add;
+        templates.shift();
+    }
+    for (const temp of templates.reverse()) {
+        const add = `\n${templateStats(temp)}`;
+        if((bottomText + add + "## bottom griefs 🥺").length > 1950) break;
+        bottomText = add + bottomText;
     }
 
-    if(text === "## top griefs") text += "\n* WOW! none! 🦭";
-    return text;
+    if(topText === "## top griefs") topText += "\n* WOW! none! 🦭";
+    return {topText, bottomText: bottomText ? "## bottom griefs 🥺" + bottomText : null};
 }
 
 // https://github.com/LITdevs/ban-chan/blob/7f4d4847c22d8cb03137752268b0c2b92fdc4770/index.js#L10
 // ideally improve on this logic later
-export async function findManagedMessage(channel: GuildTextBasedChannel, author: string): Promise<Message | null> {
-    const message = (await channel.messages.fetch({limit:1})).first();
+export async function findManagedMessage(channel: GuildTextBasedChannel, author: string, offset = 0): Promise<Message | null> {
+    const messages = (await channel.messages.fetch()).filter(message => message.author.id === author).reverse();
+    const message = messages.at(offset);
 
     if(message?.author.id === author) return message;
     return null;

@@ -39,13 +39,24 @@ async function startScanner() {
         }
 
         if(!client.user) return; // stupid typescript
-        const overview = griefList(counts.griefCache);
-        const stampedOverview = `${overview}\n-# as of <t:${now.toString().substring(0, now.toString().length-3)}:R>`
+        const {topText, bottomText} = griefList(counts.griefCache);
+        const stamp = `\n-# as of <t:${now.toString().substring(0, now.toString().length-3)}:R>`
         findManagedMessage(overviewChannel, client.user.id).then(message => {
             if(!message) {
-                void overviewChannel.send(stampedOverview);
-            } else if (message.content.split("\n-# as of")?.[0] !== overview) {
-                void message.edit(stampedOverview);
+                void overviewChannel.send(topText+stamp);
+            } else if (message.content.split("\n-# as of")?.[0] !== topText) {
+                void message.edit(topText+stamp);
+            }
+        }).catch(e => {
+            console.error(e);
+        })
+
+        findManagedMessage(overviewChannel, client.user.id, 1).then(message => {
+            if(message && !bottomText) return void message.delete();
+            if(!message) {
+                void overviewChannel.send(bottomText+stamp);
+            } else if (message.content.split("\n-# as of")?.[0] !== bottomText) {
+                void message.edit(bottomText+stamp);
             }
         }).catch(e => {
             console.error(e);
