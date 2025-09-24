@@ -80,6 +80,9 @@ async function startScanner() {
     scanner.on("newClean", (grief) => {
         void channel.send(`🦭 ${templateLink(grief.template)} is clean again`);
     })
+    scanner.on("templateChange", (e) => {
+        void channel.send(`🔄 ${templateLink(e.template)} was updated`);
+    })
 }
 
 void client.login(env.get("DISCORD_TOKEN").required().asString());

@@ -2,7 +2,7 @@ import * as fs from "node:fs/promises";
 import EventEmitter from "node:events";
 import sharp, {Sharp} from "sharp";
 import chokidar from "chokidar";
-import {sleep} from "./utils";
+import {dataFromFilename, sleep} from "./utils";
 import * as env from "env-var";
 import { join } from "node:path";
 
@@ -17,8 +17,10 @@ type ScannerEvents = {
     "newGrief": [{
         stats: GriefStats, template: CoreTemplate,
         width: number, snapshot: Sharp
-    }],
-    "newClean": ScannerEvents["newGrief"],
+    }], "newClean": ScannerEvents["newGrief"],
+    "templateChange": [{
+        template: CoreTemplate
+    }]
 }
 export type WplaceCoordinate = {
     tx: number, ty: number, px: number, py: number
@@ -54,8 +56,12 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
     #init() {
         const pends = new Set();
         const updateWrap = (filename: string) => {
-            const pend = this.#fileUpdate(filename, isReady);
+            const templateData = dataFromFilename(filename);
+            if(!templateData) return;
+
+            const pend = this.#fileUpdate(filename);
             pends.add(pend); void pend.finally(() => pends.delete(pend))
+            if(isReady) void pend.then(() => this.emit("templateChange", {template: templateData}))
         }
         let isReady = false;
 
@@ -68,7 +74,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             .on("add", (filename) => updateWrap(filename))
             .on("change", (filename) => updateWrap(filename))
             .on("unlink", (filename) => {
-                if(!/^\d+ \d+\/\d+ \d+ .+\.png$/.test(filename)) return;
+                if(!dataFromFilename(filename)) return;
                 const [tileID, templateName] = filename.split("/");
                 delete this.#templates[tileID]?.[templateName];
                 delete this.#griefCache[tileID]?.[templateName];
@@ -91,14 +97,13 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             })
     }
 
-    async #fileUpdate(filename: string, shouldLog = false) {
-        if(!/^\d+ \d+\/\d+ \d+ .+\.png$/.test(filename)) return Promise.resolve();
+    async #fileUpdate(filename: string) {
+        if(!dataFromFilename(filename)) return Promise.resolve();
         const [tileID, templateName] = filename.split("/");
 
         return fs.readFile(`templates/${tileID}/${templateName}`).then(image => {
             if(image.length === 0) return console.warn(`Saw "${filename}" but it's an empty file..`)
             this.#templates[tileID][templateName] = sharp(image);
-            if(shouldLog) console.log(`"${filename}" was updated.`)
         }).catch(err => console.error(err))
     }
 
@@ -111,15 +116,12 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
 
         for (const tileID of Object.keys(this.#templates)) {
             for (const templateName of Object.keys(this.#templates[tileID])) {
+                const templateData = dataFromFilename(`${tileID}/${templateName}`)!;
                 overlay.templates.push({
-                    name: templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown",
+                    name: templateData.name,
                     source: encodeURI(`${templateBaseURL}/${tileID}/${templateName}`),
-                    coords: [
-                        parseInt(tileID.split(" ")[0]),
-                        parseInt(tileID.split(" ")[1]),
-                        parseInt(templateName.split(" ")[0]),
-                        parseInt(templateName.split(" ")[1])
-                    ]
+                    coords: [templateData.location.tx, templateData.location.ty,
+                        templateData.location.px, templateData.location.py]
                 })
             }
         }
@@ -149,16 +151,10 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
 
             for (const [templateName, template] of Object.entries(this.#templates[tileID])) {
                 try {
-                    const check = await this.#checkTemplate(template, parseInt(templateName.split(" ")[0]), parseInt(templateName.split(" ")[1]), tileSharp)
+                    const templateData = dataFromFilename(`${tileID}/${templateName}`)!;
+                    const check = await this.#checkTemplate(template, templateData.location.px, templateData.location.py, tileSharp)
 
                     mismatches += check.mismatches; pixels += check.pixels; templateCount++;
-                    const templateLocation: WplaceCoordinate = {
-                        tx: parseInt(tileID.split(" ")[0]),
-                        ty: parseInt(tileID.split(" ")[1]),
-                        px: parseInt(templateName.split(" ")[0]),
-                        py: parseInt(templateName.split(" ")[1])
-                    }
-                    const parsedTemplateName = templateName.match(/\d+ \d+ (.+)\..+/)?.[1] || "unknown";
 
                     const prevCache = this.#griefCache[tileID][templateName];
                     const firstScan = !prevCache;
@@ -167,7 +163,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                         check.mismatches === prevCache.stats.mismatches ? prevCache.stats.increasing :
                             check.mismatches > prevCache.stats.mismatches;
 
-                    this.#griefCache[tileID][templateName] = {template: {name: parsedTemplateName, location: templateLocation}, stats: {pixels: check.pixels, mismatches: check.mismatches, increasing}};
+                    this.#griefCache[tileID][templateName] = {template: templateData, stats: {pixels: check.pixels, mismatches: check.mismatches, increasing}};
 
                     if(firstScan && check.mismatches > 0 || !firstScan && hasChanged) {
                         if(check.mismatches > 0) console.log(`Found mismatch in "${tileID}/${templateName}", ${check.mismatches}/${check.pixels} pixels.`)

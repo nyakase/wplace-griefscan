@@ -44,6 +44,22 @@ export const tempStatsEmoji = (stats: GriefStats) => {
     if(stats.increasing === null) return "🤷‍♀️";
     return stats.increasing ? "📈" : "📉";
 }
+
+export const dataFromFilename = (filename: string): CoreTemplate | null => {
+    const grab = /^(?<tx>\d+) (?<ty>\d+)\/(?<px>\d+) (?<py>\d+) (?<name>.+)\.png$/.exec(filename);
+    if(!grab?.groups) return null;
+
+    const {tx, ty, px, py, name} = grab.groups;
+    return {
+        name, location: {
+            tx: parseInt(tx),
+            ty: parseInt(ty),
+            px: parseInt(px),
+            py: parseInt(py)
+        }
+    }
+}
+
 export const griefList = (griefCache: GriefCache) => {
     let topText = "## top griefs";
     let bottomText = "";
