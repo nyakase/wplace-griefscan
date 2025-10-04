@@ -53,6 +53,8 @@ async function startScanner() {
 
         findManagedMessage(overviewChannel, client.user.id, 1).then(message => {
             if(message && !bottomText) return void message.delete();
+            if(!bottomText) return;
+            
             if(!message) {
                 void overviewChannel.send(bottomText+stamp);
             } else if (message.content.split("\n-# as of")?.[0] !== bottomText) {
