@@ -26,16 +26,17 @@ async function startScanner() {
     let lastTopicUpdate = 0; // lol
     scanner.on("scannedAll", (counts) => {
         bootScan = false;
+        const serverStruggling = counts.trueTileCount > counts.scannedTileCount;
+        const tempsStruggling = counts.trueTemplateCount > counts.scannedTemplateCount;
+        const alreadyStruggling = channel.topic && channel.topic.includes("⚠️")
 
-        const trueTileCount = Object.keys(counts.griefCache).length;
-        const serverStruggling = counts.scannedTileCount !== trueTileCount;
-
-        const topic = serverStruggling ? "Couldn't check some tiles" : `Checking ${counts.scannedTileCount} tiles against ${counts.scannedTemplateCount} templates • ${counts.mismatches}/${counts.pixels} mismatched pixels`;
+        const topic = `Checking ${counts.scannedTileCount}${serverStruggling?` (⚠️ not ${counts.trueTileCount}) `:" "}tiles against ${counts.scannedTemplateCount}${tempsStruggling?` (⚠️ not ${counts.trueTemplateCount}) `:" "}templates • ${counts.mismatches}/${counts.pixels} mismatched pixels`;
         const now = Date.now();
         if(channel.topic?.split(" as of ")?.[0] !== topic && (now - lastTopicUpdate) >= 5 * 60 * 1000) {
             lastTopicUpdate = now;
+            if(serverStruggling && !alreadyStruggling) void channel.send(`⚠️ some tiles couldn't be downloaded`);
+            if(tempsStruggling && !alreadyStruggling) void channel.send(`⚠️ some templates couldn't be compared`);
             void channel.setTopic(`${topic} as of <t:${lastTopicUpdate.toString().substring(0, lastTopicUpdate.toString().length-3)}:R>`);
-            if(serverStruggling) void channel.send("couldn't check some tiles!");
         }
 
         if(!client.user) return; // stupid typescript

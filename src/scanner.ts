@@ -12,7 +12,7 @@ type ScannerEvents = {
     "scannedAll": [{
         pixels: number, mismatches: number,
         scannedTileCount: number, scannedTemplateCount: number
-        griefCache: GriefCache
+        trueTileCount: number, trueTemplateCount: number, griefCache: GriefCache
     }],
     "newGrief": [{
         stats: GriefStats, template: CoreTemplate,
@@ -135,10 +135,14 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
     }
 
     async #scan() {
-        let mismatches = 0; let pixels = 0; let templateCount = 0; let tileCount = 0;
+        let mismatches = 0, pixels = 0, tileCount = 0, templateCount = 0, trueTemplateCount = 0;
+        const allTiles = Object.keys(this.#templates);
 
-        for (const tileID of Object.keys(this.#templates)) {
+        for (const tileID of allTiles) {
             const coords = tileID.split(" ");
+            const allTemplates = Object.entries(this.#templates[tileID]);
+            trueTemplateCount += allTemplates.length;
+
             let tileFile;
             try {
                 tileFile = await fetch(`https://backend.wplace.live/files/s0/tiles/${coords[0]}/${coords[1]}.png`, {signal: AbortSignal.timeout(5*1000)});
@@ -148,7 +152,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             tileCount++;
             const tileSharp = sharp(await tileFile.arrayBuffer());
 
-            for (const [templateName, template] of Object.entries(this.#templates[tileID])) {
+            for (const [templateName, template] of allTemplates) {
                 try {
                     const templateData = dataFromFilename(`${tileID}/${templateName}`)!;
                     const check = await this.#checkTemplate(template, templateData.location.px, templateData.location.py, tileSharp)
@@ -176,7 +180,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             await sleep(300);
         }
 
-        this.emit("scannedAll", {mismatches, pixels, scannedTileCount: tileCount, scannedTemplateCount: templateCount, griefCache: this.#griefCache});
+        this.emit("scannedAll", {mismatches, pixels, scannedTileCount: tileCount, scannedTemplateCount: templateCount, trueTileCount: allTiles.length, trueTemplateCount, griefCache: this.#griefCache});
     }
 
     async #checkTemplate(template: Sharp, x: number, y: number, tile: Sharp) {
