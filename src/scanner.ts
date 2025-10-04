@@ -42,7 +42,6 @@ type CharityOverlay = {
 const faction = env.get("OVERLAY_FACTION").asString();
 const factionContact = env.get("OVERLAY_CONTACT").asString();
 const templateBaseURL = env.get("FILESERVER_BASEURL").asString();
-if(!faction || !factionContact || !templateBaseURL) console.warn("Overlay generation is disabled because one of the following are unset: OVERLAY_FACTION, OVERLAY_CONTACT, FILESERVER_BASEURL");
 
 export default class Scanner extends EventEmitter<ScannerEvents> {
     #templates: TemplateStore = {};

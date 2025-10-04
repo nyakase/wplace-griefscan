@@ -17,10 +17,10 @@ client.once(Events.ClientReady, (client) => {
 
 async function startScanner() {
     const channel = await client.channels.fetch(env.get("DISCORD_CHANNEL").required().asString());
-    if(channel?.type !== ChannelType.GuildText) throw new Error("Can't send messages in the channel >.>");
+    if(channel?.type !== ChannelType.GuildText) throw new Error("The channel must be a regular text channel in a server.");
 
     const overviewChannel = await client.channels.fetch(env.get("DISCORD_OVERVIEW_CHANNEL").required().asString());
-    if(overviewChannel?.type !== ChannelType.GuildText) throw new Error("Can't send messages in the overview channel >.>");
+    if(overviewChannel?.type !== ChannelType.GuildText) throw new Error("The overview channel must be a regular text channel in a server.>");
 
     const scanner = new Scanner();
     let lastTopicUpdate = 0; // lol
