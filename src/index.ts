@@ -27,7 +27,7 @@ async function startScanner() {
     scanner.on("scannedAll", (counts) => {
         bootScan = false;
         const serverStruggling = counts.trueTileCount > counts.scannedTileCount;
-        const tempsStruggling = counts.trueTemplateCount > counts.scannedTemplateCount;
+        const tempsStruggling = !serverStruggling && (counts.trueTemplateCount > counts.scannedTemplateCount);
         const alreadyStruggling = channel.topic && channel.topic.includes("⚠️")
 
         const topic = `Checking ${counts.scannedTileCount}${serverStruggling?` (⚠️ not ${counts.trueTileCount}) `:" "}tiles against ${counts.scannedTemplateCount}${tempsStruggling?` (⚠️ not ${counts.trueTemplateCount}) `:" "}templates • ${counts.mismatches}/${counts.pixels} mismatched pixels`;
