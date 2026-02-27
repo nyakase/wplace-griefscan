@@ -145,7 +145,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
 
             let tileFile;
             try {
-                tileFile = await fetch(`https://backend.wplace.live/tile/${coords[0]}/${coords[1]}.png`, {signal: AbortSignal.timeout(5*1000)});
+                tileFile = await fetch(`https://backend.wplace.live/files/s0/tiles/${coords[0]}/${coords[1]}.png`, {signal: AbortSignal.timeout(5*1000)});
             } catch(e) {console.error(`Failed to download "${coords[0]} ${coords[1]}": ${e.message || e}`); continue;}
             if(!tileFile.ok) {console.warn(`HTTP ${tileFile.status} for "${coords[0]} ${coords[1]}".`); continue;}
 
