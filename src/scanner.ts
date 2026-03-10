@@ -42,6 +42,7 @@ type CharityOverlay = {
 const faction = env.get("OVERLAY_FACTION").asString();
 const factionContact = env.get("OVERLAY_CONTACT").asString();
 const templateBaseURL = env.get("FILESERVER_BASEURL").asString();
+const templateFolder = env.get("TEMPLATE_FOLDER").asString() || join(__dirname, "../templates");
 
 export default class Scanner extends EventEmitter<ScannerEvents> {
     #templates: TemplateStore = {};
@@ -64,7 +65,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
         }
         let isReady = false;
 
-        chokidar.watch(".", {cwd: "templates", awaitWriteFinish: true})
+        chokidar.watch(".", {cwd: templateFolder, awaitWriteFinish: true})
             .on("addDir", (dir) => {
                 if(!/^\d+ \d+$/.test(dir)) return;
                 this.#templates[dir] = {};
@@ -100,7 +101,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
         if(!dataFromFilename(filename)) return Promise.resolve();
         const [tileID, templateName] = filename.split("/");
 
-        return fs.readFile(`templates/${tileID}/${templateName}`).then(image => {
+        return fs.readFile(join(templateFolder, tileID, templateName)).then(image => {
             if(image.length === 0) return console.warn(`Saw "${filename}" but it's an empty file..`)
             this.#templates[tileID][templateName] = sharp(image);
         }).catch(err => console.error(err))
@@ -125,7 +126,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             }
         }
 
-        void fs.writeFile(join(__dirname, "../templates/overlay.json"), JSON.stringify(overlay));
+        void fs.writeFile(join(templateFolder, "overlay.json"), JSON.stringify(overlay));
     }
 
     async #scanLoop() {
@@ -146,7 +147,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             let tileFile;
             try {
                 tileFile = await fetch(`https://backend.wplace.live/files/s0/tiles/${coords[0]}/${coords[1]}.png`, {signal: AbortSignal.timeout(5*1000)});
-            } catch(e) {console.error(`Failed to download "${coords[0]} ${coords[1]}": ${e.message || e}`); continue;}
+            } catch(e) {console.error(`Failed to download "${coords[0]} ${coords[1]}": ${e instanceof Error ? e.message : e}`); continue;}
             if(!tileFile.ok) {console.warn(`HTTP ${tileFile.status} for "${coords[0]} ${coords[1]}".`); continue;}
 
             tileCount++;
