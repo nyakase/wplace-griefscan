@@ -41,7 +41,7 @@ async function startScanner() {
 
         if(!client.user) return; // stupid typescript
         const {topText, bottomText} = griefList(counts.griefCache);
-        const stamp = `\n-# as of <t:${now.toString().substring(0, now.toString().length-3)}:R>`
+        const stamp = counts.griefCache.writtenAt ? `\n-# as of <t:${counts.griefCache.writtenAt.getTime().toString().substring(0, now.toString().length-3)}:R>` : "";
         findManagedMessage(overviewChannel, client.user.id).then(message => {
             if(!message) {
                 void overviewChannel.send(topText+stamp);

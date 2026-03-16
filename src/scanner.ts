@@ -7,7 +7,13 @@ import * as env from "env-var";
 import { join } from "node:path";
 
 type TemplateStore = Record<string, Record<string, Sharp>>;
-export type GriefCache = Record<string, Record<string, {stats: GriefStats, template: CoreTemplate}>>;
+export type GriefCache = {
+    writtenAt: Date | null;
+    tiles: Record<string, {
+        fetchedAt: Date | null;
+        templates: Record<string, {stats: GriefStats, template: CoreTemplate}>;
+    }>;
+};
 type ScannerEvents = {
     "scannedAll": [{
         pixels: number, mismatches: number,
@@ -46,7 +52,7 @@ const templateFolder = env.get("TEMPLATE_FOLDER").asString() || join(__dirname, 
 
 export default class Scanner extends EventEmitter<ScannerEvents> {
     #templates: TemplateStore = {};
-    #griefCache: GriefCache = {};
+    griefCache: GriefCache = {writtenAt: null, tiles: {}};
 
     constructor() {
         super();
@@ -69,7 +75,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             .on("addDir", (dir) => {
                 if(!/^\d+ \d+$/.test(dir)) return;
                 this.#templates[dir] = {};
-                this.#griefCache[dir] = {};
+                this.griefCache.tiles[dir] = {fetchedAt: null, templates: {}};
             })
             .on("add", (filename) => updateWrap(filename))
             .on("change", (filename) => updateWrap(filename))
@@ -77,12 +83,12 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                 if(!dataFromFilename(filename)) return;
                 const [tileID, templateName] = filename.split("/");
                 delete this.#templates[tileID]?.[templateName];
-                delete this.#griefCache[tileID]?.[templateName];
+                delete this.griefCache.tiles[tileID]?.templates[templateName];
             })
             .on("unlinkDir", (dir) => {
                 if(!/^\d+ \d+$/.test(dir)) return;
                 delete this.#templates[dir];
-                delete this.#griefCache[dir];
+                delete this.griefCache.tiles[dir];
             })
             .on("ready", () => {
                 isReady = true;
@@ -137,6 +143,7 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
 
     async #scan() {
         let mismatches = 0, pixels = 0, tileCount = 0, templateCount = 0, trueTemplateCount = 0;
+        const scanResults = structuredClone(this.griefCache);
         const allTiles = Object.keys(this.#templates);
 
         for (const tileID of allTiles) {
@@ -147,10 +154,11 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             let tileFile;
             try {
                 tileFile = await fetch(`https://backend.wplace.live/files/s0/tiles/${coords[0]}/${coords[1]}.png`, {signal: AbortSignal.timeout(5*1000)});
-            } catch(e) {console.error(`Failed to download "${coords[0]} ${coords[1]}": ${e instanceof Error ? e.message : e}`); continue;}
+            } catch(e) {console.error(`Failed to download "${coords[0]} ${coords[1]}": ${e instanceof Error ? e.message : String(e)}`); continue;}
             if(!tileFile.ok) {console.warn(`HTTP ${tileFile.status} for "${coords[0]} ${coords[1]}".`); continue;}
 
             tileCount++;
+            scanResults.tiles[tileID].fetchedAt = new Date();
             const tileSharp = sharp(await tileFile.arrayBuffer());
 
             for (const [templateName, template] of allTemplates) {
@@ -160,18 +168,18 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
 
                     mismatches += check.mismatches; pixels += check.pixels; templateCount++;
 
-                    const prevCache = this.#griefCache[tileID][templateName];
+                    const prevCache = this.griefCache.tiles[tileID].templates[templateName];
                     const firstScan = !prevCache;
                     const hasChanged = check.mismatches !== prevCache?.stats.mismatches;
                     const increasing = firstScan ? null :
                         check.mismatches === prevCache.stats.mismatches ? prevCache.stats.increasing :
                             check.mismatches > prevCache.stats.mismatches;
 
-                    this.#griefCache[tileID][templateName] = {template: templateData, stats: {pixels: check.pixels, mismatches: check.mismatches, increasing}};
+                    scanResults.tiles[tileID].templates[templateName] = {template: templateData, stats: {pixels: check.pixels, mismatches: check.mismatches, increasing}};
 
                     if(firstScan && check.mismatches > 0 || !firstScan && hasChanged) {
                         if(check.mismatches > 0) console.log(`Found mismatch in "${tileID}/${templateName}", ${check.mismatches}/${check.pixels} pixels.`)
-                        this.emit(check.mismatches > 0 ? "newGrief" : "newClean", {...this.#griefCache[tileID][templateName], snapshot: check.snapshot, width: check.width})
+                        this.emit(check.mismatches > 0 ? "newGrief" : "newClean", {...scanResults.tiles[tileID].templates[templateName], snapshot: check.snapshot, width: check.width})
                     }
                 } catch (e) {
                     console.error(`Trouble checking "${tileID}/${templateName}".`, e)
@@ -181,7 +189,10 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             await sleep(300);
         }
 
-        this.emit("scannedAll", {mismatches, pixels, scannedTileCount: tileCount, scannedTemplateCount: templateCount, trueTileCount: allTiles.length, trueTemplateCount, griefCache: this.#griefCache});
+        scanResults.writtenAt = new Date();
+        this.griefCache = scanResults;
+
+        this.emit("scannedAll", {mismatches, pixels, scannedTileCount: tileCount, scannedTemplateCount: templateCount, trueTileCount: allTiles.length, trueTemplateCount, griefCache: this.griefCache});
     }
 
     async #checkTemplate(template: Sharp, x: number, y: number, tile: Sharp) {

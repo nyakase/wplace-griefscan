@@ -63,7 +63,7 @@ export const dataFromFilename = (filename: string): CoreTemplate | null => {
 export const griefList = (griefCache: GriefCache) => {
     let topText = "## top griefs";
     let bottomText = "";
-    const flatCache = Object.values(griefCache).flatMap(tile => Object.values(tile));
+    const flatCache = Object.values(griefCache.tiles).flatMap(tile => Object.values(tile.templates));
     const templates = flatCache.filter(temp => temp.stats.mismatches > 0).sort((a,b) => b.stats.mismatches-a.stats.mismatches);
 
     for (const temp of templates.slice()) {
