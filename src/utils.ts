@@ -28,12 +28,12 @@ type TemplateStatsOptions = {
     template: CoreTemplate,
     stats: GriefStats
 }
-const templateBaseURL = env.get("FILESERVER_BASEURL").asString();
-if(!templateBaseURL) console.warn("Template linking is disabled because FILESERVER_BASEURL is unset")
+const webBase = env.get("WEBSITE_BASEURL").asString();
+const fsBase = env.get("FILESERVER_BASEURL").asString();
 export const wplaceLink = ({lat,lng}: WorldCoordinate) => `https://wplace.live/?lat=${lat}&lng=${lng}&zoom=15`;
 export const templateLink = ({name, location}: CoreTemplate) => {
-    if(templateBaseURL) {
-        return `**[${name}](${encodeURI(`${templateBaseURL}/${location.tx} ${location.ty}/${location.px} ${location.py} ${name}.png`)})** ([${location.tx} ${location.ty} ${location.px} ${location.py}](<${wplaceLink(geoCoords(location))}>))`
+    if(webBase || fsBase) {
+        return `**[${name}](${encodeURI(`${webBase || fsBase}/${location.tx} ${location.ty}/${location.px} ${location.py} ${name}${!webBase ? ".png" : ""}`)})** ([${location.tx} ${location.ty} ${location.px} ${location.py}](<${wplaceLink(geoCoords(location))}>))`
     } else {
         return `**[${name}](<${wplaceLink(geoCoords(location))}>)**`
     }

@@ -37,29 +37,17 @@ export type CoreTemplate = {
 export type GriefStats = {
     pixels: number, mismatches: number, increasing: boolean | null
 }
-type CharityOverlay = {
-    faction: string, contact: string,
-    templates: {
-        name: string, source: string,
-        coords: [number,number,number,number]
-    }[]
-}
 
-const faction = env.get("OVERLAY_FACTION").asString();
-const factionContact = env.get("OVERLAY_CONTACT").asString();
-const templateBaseURL = env.get("FILESERVER_BASEURL").asString();
 const templateFolder = env.get("TEMPLATE_FOLDER").asString() || join(__dirname, "../templates");
-
 export default class Scanner extends EventEmitter<ScannerEvents> {
     #templates: TemplateStore = {};
     griefCache: GriefCache = {writtenAt: null, tiles: {}};
 
     constructor() {
         super();
-        this.#init();
     }
 
-    #init() {
+    start() {
         const pends = new Set();
         const updateWrap = (filename: string) => {
             const templateData = dataFromFilename(filename);
@@ -92,15 +80,13 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             })
             .on("ready", () => {
                 isReady = true;
-                void Promise.all(pends).then(() => {
-                    void this.#scanLoop();
-                    this.#writeOverlay();
-                })
+                void Promise.all(pends).then(() => this.#scanLoop());
             })
-            .on("all", (_event, filename) => {
-                if(!isReady || !/^\d+ \d+(?:\/\d+ \d+ .+\.png|)$/.test(filename)) return;
-                void Promise.all(pends).then(() => this.#writeOverlay())
-            })
+    }
+
+    templateFile(template: CoreTemplate) {
+        return this.#templates[`${template.location.tx} ${template.location.ty}`]?.
+            [`${template.location.px} ${template.location.py} ${template.name}.png`] || null;
     }
 
     async #fileUpdate(filename: string) {
@@ -111,28 +97,6 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
             if(image.length === 0) return console.warn(`Saw "${filename}" but it's an empty file..`)
             this.#templates[tileID][templateName] = sharp(image);
         }).catch(err => console.error(err))
-    }
-
-    #writeOverlay() {
-        if(!faction || !factionContact || !templateBaseURL) return;
-        const overlay: CharityOverlay = {
-            faction: faction, contact: factionContact,
-            templates: []
-        }
-
-        for (const tileID of Object.keys(this.#templates)) {
-            for (const templateName of Object.keys(this.#templates[tileID])) {
-                const templateData = dataFromFilename(`${tileID}/${templateName}`)!;
-                overlay.templates.push({
-                    name: templateData.name,
-                    source: encodeURI(`${templateBaseURL}/${tileID}/${templateName}`),
-                    coords: [templateData.location.tx, templateData.location.ty,
-                        templateData.location.px, templateData.location.py]
-                })
-            }
-        }
-
-        void fs.writeFile(join(templateFolder, "overlay.json"), JSON.stringify(overlay));
     }
 
     async #scanLoop() {

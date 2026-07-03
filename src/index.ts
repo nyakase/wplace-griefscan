@@ -2,16 +2,23 @@ import "dotenv/config";
 import * as env from 'env-var';
 import Scanner from "./scanner";
 import {Client, Events, GatewayIntentBits, ChannelType, ActivityType} from "discord.js";
-import {findManagedMessage, griefList, templateLink, templateStats} from "./utils";
+import {dataFromFilename, findManagedMessage, geoCoords, griefList, templateLink, templateStats, wplaceLink} from "./utils";
+import ejs from "ejs";
+import { join } from "node:path";
 
 const client = new Client({intents: [GatewayIntentBits.Guilds]})
 const alertOnBoot = env.get("ALERT_ON_BOOT").asBool();
+const webPort = env.get("WEBSITE_PORT").asPortNumber();
+const webBase = env.get("WEBSITE_BASEURL").asString();
+const fsBase = env.get("FILESERVER_BASEURL").asString();
+const scanner = new Scanner();
 let bootScan = true;
 
 client.once(Events.ClientReady, (client) => {
     console.log(`Hewwo~ I'm logged in as ${client.user.username} :3`);
     client.user.setPresence({activities: [{type: ActivityType.Watching, name: "your pixels"}]})
 
+    void startWebsite();
     void startScanner();
 })
 
@@ -22,8 +29,8 @@ async function startScanner() {
     const overviewChannel = await client.channels.fetch(env.get("DISCORD_OVERVIEW_CHANNEL").required().asString());
     if(overviewChannel?.type !== ChannelType.GuildText) throw new Error("The overview channel must be a regular text channel in a server.>");
 
-    const scanner = new Scanner();
     let lastTopicUpdate = 0; // lol
+    scanner.start();
     scanner.on("scannedAll", (counts) => {
         bootScan = false;
         const serverStruggling = counts.trueTileCount > counts.scannedTileCount;
@@ -85,6 +92,35 @@ async function startScanner() {
     })
     scanner.on("templateChange", (e) => {
         void channel.send(`🔄 ${templateLink(e.template)} was updated`);
+    })
+}
+
+function startWebsite() {
+    if(!webPort || !webBase) return;
+    Bun.serve({
+        port: webPort,
+        async fetch(req) {
+            if(!scanner.griefCache.writtenAt) return new Response("Come back later, the scanner needs to complete its first scan.", {status: 500});
+
+            const pathname = new URL(req.url).pathname;
+            const forFile = pathname.endsWith(".png");
+
+            const coreTemplate = dataFromFilename(`${decodeURI(pathname.slice(1))}${!forFile ? ".png" : ""}`);
+            if(!coreTemplate) return new Response("Sorry, couldn't find that page.", {status: 404});
+            const templateFile = scanner.templateFile(coreTemplate);
+            if(!templateFile) return new Response("Sorry, couldn't find that template.", {status: 404});
+
+            if(forFile) {
+                if(fsBase) return Response.redirect(`${fsBase}${pathname}`);
+                return new Response(new Uint8Array(await templateFile.toBuffer()), {headers: {
+                    "Access-Control-Allow-Origin": "*", "Content-Disposition": "inline", "Content-Type": "image/png"}});
+            }
+
+            return new Response(await ejs.renderFile(join(__dirname, "web/template.ejs"), {coreTemplate,
+                fileURL: `${fsBase || ""}${pathname}.png`,
+                wplaceURL: wplaceLink(geoCoords(coreTemplate.location)),
+            }), {headers: {"Content-Type": "text/html"}});
+        }
     })
 }
 

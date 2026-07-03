@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <title>wplace-griefscan: <%= coreTemplate.name%></title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noindex">
+        <style>
+            body {
+                font-family: sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            h1, h2 {
+                margin: 0;
+            }
+            h2 {
+                font-size: 1.3em;
+            }
+            button {
+                padding: .3em;
+            }
+
+            .info {
+                max-width: 25em;
+            }
+            .interactions {
+                margin: 1em 0;
+                display: flex;
+                flex-direction: column;
+                gap: .5em;
+            }
+
+            .hidden { display: none; }
+            #importWiz {
+                position: absolute;
+                margin-top: 1em;
+                padding: .5em;
+                border: 2px solid black;
+                background-color: white;
+                top: 0;
+            }
+        </style>
+        <script>
+            let importWizStep = 1;
+            function importWiz() {
+                document.querySelector("#importWiz").classList.remove("hidden");
+            }
+            function NeXTSTEP() {
+                document.querySelector(`#wizStep${importWizStep}`).classList.add("hidden");
+                importWizStep += 1;
+                document.querySelector(`#wizStep${importWizStep}`).classList.remove("hidden");
+                document.querySelector("#wizStep").innerText = importWizStep;
+            }
+            function finishWizard() {
+                // TODO: implement wplace overlay support in wimport so this is actually useful, just forcing BM for now
+                localStorage.setItem("overlayTool", "bluemarble" || document.querySelector("#overlayTool").value);
+                wimport();
+            }
+
+            function wimport() {
+                overlayTool = localStorage.getItem("overlayTool");
+                if(!overlayTool) return importWiz();
+                document.location.href = `${wplacelive.href}&wimport_pos=<%= Object.values(coreTemplate.location).join(",")%>&wimport_template=${template.src}&wimport_tool=${overlayTool}`
+            }
+        </script>
+    </head>
+    <body>
+        <div class="info">
+            <h1><%= coreTemplate.name%></h1>
+            <h2><a href="<%= wplaceURL%>" aria-label="visit on Wplace.live" id="wplacelive">(<%= Object.values(coreTemplate.location).join(" ")%>)</a></h2>
+            <div class="interactions">
+                <button onclick="wimport()">import template to blue marble</button>
+                <noscript><i>Please enable JavaScript to import.</i></noscript>
+            </div>
+        </div>
+        <div class="templatewrap"><img alt="" src="<%= fileURL%>" id="template"></div>
+
+        <div id="importWiz" class="hidden">
+            <h2>Import wizard <!--(step <span id="wizStep">1</span>/2)--></h2>
+            <div id="wizStep1">
+                <p>Hey! Looks like it's your first time on this device. To import, you need browser extensions.<br>Install <a href="https://tampermonkey.net" target="_blank">Tampermonkey</a>, <em>then</em> click these to install them: <a href="https://github.com/SwingTheVine/Wplace-BlueMarble/releases/download/pre/BlueMarble.user.js">Blue Marble</a> and <a href="https://github.com/nyakase/userscripts/raw/refs/heads/main/scripts/wimport.user.js" target="_blank">Wimport</a>.</p>
+                <button onclick="finishWizard()">I've installed them, import now!</button>
+            </div>
+            <!--<div id="wizStep2" class="hidden">
+                <p>Now you can choose what overlay tool to import the template to. I'll remember this the next time.<br>The built-in overlay doesn't need to be installed, while the others do.</p>
+                <label>
+                    Overlay tool:
+                    <select id="overlayTool">
+                        <option value="wplace">Built-in overlay (by Wplace)</option>
+                        <option value="bluemarble">Blue Marble (by SwingTheVine)</option>
+                    </select>
+                </label>
+                <button onclick="finishWizard()">Alright, let's import this thing!</button>
+            </div>-->
+        </div>
+    </body>
+</html>
