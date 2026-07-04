@@ -90,8 +90,9 @@ async function startScanner() {
     scanner.on("newClean", (grief) => {
         void channel.send(`🦭 ${templateLink(grief.template)} is clean again`);
     })
-    scanner.on("templateChange", (e) => {
-        void channel.send(`🔄 ${templateLink(e.template)} was updated`);
+    scanner.on("templateState", ({state, template}) => {
+        const emoji = state === "added" ? "📥" : state === "updated" ? "🔄" : "📤";
+        void channel.send(`${emoji} ${templateLink(template)} was ${state}`);
     })
 }
 

@@ -24,7 +24,8 @@ type ScannerEvents = {
         stats: GriefStats, template: CoreTemplate,
         width: number, snapshot: Sharp
     }], "newClean": ScannerEvents["newGrief"],
-    "templateChange": [{
+    "templateState": [{
+        state: "added" | "updated" | "removed",
         template: CoreTemplate
     }]
 }
@@ -49,13 +50,13 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
 
     start() {
         const pends = new Set();
-        const updateWrap = (filename: string) => {
+        const updateWrap = (filename: string, state: "added" | "updated") => {
             const templateData = dataFromFilename(filename);
             if(!templateData) return;
 
             const pend = this.#fileUpdate(filename);
             pends.add(pend); void pend.finally(() => pends.delete(pend))
-            if(isReady) void pend.then(() => this.emit("templateChange", {template: templateData}))
+            if(isReady) void pend.then(() => this.emit("templateState", {state, template: templateData}))
         }
         let isReady = false;
 
@@ -65,13 +66,16 @@ export default class Scanner extends EventEmitter<ScannerEvents> {
                 this.#templates[dir] = {};
                 this.griefCache.tiles[dir] = {fetchedAt: null, templates: {}};
             })
-            .on("add", (filename) => updateWrap(filename))
-            .on("change", (filename) => updateWrap(filename))
+            .on("add", (filename) => updateWrap(filename, "added"))
+            .on("change", (filename) => updateWrap(filename, "updated"))
             .on("unlink", (filename) => {
-                if(!dataFromFilename(filename)) return;
+                const templateData = dataFromFilename(filename);
+                if(!templateData) return;
+
                 const [tileID, templateName] = filename.split("/");
                 delete this.#templates[tileID]?.[templateName];
                 delete this.griefCache.tiles[tileID]?.templates[templateName];
+                if(isReady) this.emit("templateState", {state: "removed", template: templateData})
             })
             .on("unlinkDir", (dir) => {
                 if(!/^\d+ \d+$/.test(dir)) return;
